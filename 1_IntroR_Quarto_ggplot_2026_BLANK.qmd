@@ -101,13 +101,13 @@ The **fivethirtyeight** package contains data sets written about on the FiveThir
 install.packages("fivethirtyeight")
 library(fivethirtyeight)
 
-fivethirtyeight::
+fivethirtyeight
 ```
 
 What are some ways we can look at this dataset?
 
 ```{r}
-candy_rankings
+install.packages(candy_rankings)
 ```
 
 ```{r}
@@ -272,22 +272,31 @@ Reference: bit.ly/colors-r
 You can change the color in the geom argument. Test out how it works on different geoms!
 
 ```{r}
-ggplot() +  
-  aes(x = ) + 
-  geom_bar(color = '', fill = ) 
+View(candy_rankings)
+```
+
+```{r}
+fruit <- ggplot(candy_rankings) +  
+  aes(x = fruity) + 
+  geom_bar(color = 'lightskyblue', fill = 'honeydew') 
+
+fruit
 ```
 
 If you want the color to reflect another variable, for example, if there is fruit in the candy too, then you make it a **mapped aesthetic**, or one that refers to some data to assign a visual. In this case, you place the **color** or **fill** argument **inside aes().**
 
 ```{r}
-ggplot() +  
-  aes(x = , fill = ) + 
+ggplot(candy_rankings) +  
+  aes(x = chocolate, fill = fruity) + 
   geom_bar(position = ) 
 ```
 
 ### Challenge question: what proportion of candies have BOTH chocolate and caramel?
 
 ```{r}
+ggplot(candy_rankings) +
+  aes (x = chocolate, fill = caramel) +
+  geom_bar(position = position_dodge())
 
 ```
 
@@ -296,17 +305,18 @@ ggplot() +
 Working on a scatterplot and want the points to be different shapes? Easy too!
 
 ```{r}
-ggplot() +
-  aes(x = ,
-      y = ) +
-  geom_point()
+ggplot(candy_rankings) +
+  aes(x = pricepercent,
+      y = winpercent ) +
+  geom_point(shape = 2)
 ```
 
 Similarly, you can **map** shape to a variable in the aes() function.
 
 ```{r}
-ggplot() +
-  aes() +
+ggplot(candy_rankings) +
+  aes(x = pricepercent, y = winpercent, shape = chocolate) +
+  geom_point()
   
 ```
 
@@ -315,13 +325,14 @@ ggplot() +
 Pretty self-explanatory here. labs() are added separately from the other plot parameters.
 
 ```{r}
-ggplot() +
-  aes(
-  labs(x = 
-       y =
-       title = ,
-       subtitle = 
-       caption =
+ggplot(candy_rankings) +
+  aes(x = sugarpercent, y = winpercent) +
+  geom_point() +
+  labs(x = "Sugar Percent", 
+       y = "Win Percentage", 
+       title = "Relationship between the dependent and independent variable",
+       subtitle = "for Halloween candies", 
+       caption = "Based on an online survey by FiveThirtyEight")
 
 ```
 
