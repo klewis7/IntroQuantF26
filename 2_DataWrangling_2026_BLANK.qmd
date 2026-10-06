@@ -308,7 +308,7 @@ titanic |>
 arrange(-Fare)
 ```
 
-###  3. `select()`
+### 3. `select()`
 
 `select()` makes a new data frame with only certain columns
 
