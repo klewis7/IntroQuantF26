@@ -121,7 +121,7 @@ Graph 1:
 
 ```{r}
 
-view(SizeData_2022_2025)
+View(SizeData_2022_2025)
 
 
 ggplot(SizeData_2022_2025)+
@@ -150,6 +150,9 @@ For the population density analysis, we will analyze data from Shaws Cove, Heisl
 
 ```{r}
 No_CDM_Sizes <- SizeData_2022_2025 |> 
+ filter(site != "Corona del Mar")
+
+No_CDM_Sizes
 ```
 
 #### 2.1. How many limpets did we measure at each site in each year for sizes?
@@ -161,12 +164,21 @@ No_CDM_Sizes
 
 # How many did we measure total, across both sites?
 No_CDM_Sizes |> 
+  nrow() 
+#1767
 
 ## How many did we measure at each site? 
-No_CDM_Sizes |> 
+No_CDM_Sizes |>
+  group_by(site) |> 
+  summarize(count = n())
+# Heisler Park = 492, Shaws Cove = 806, Treasure Cove = 469	
 
 # How many did we measure in each transect? 
-No_CDM_Sizes |> 
+transect_counts <- No_CDM_Sizes |> 
+  group_by(transect_num) |> 
+  summarize(count = n())
+ 
+transect_counts
 ```
 
 #### 2.2 What was the limpet density (i.e., limpets per square meter) for each transect?
@@ -174,10 +186,14 @@ No_CDM_Sizes |>
 Make a new dataframe out of the `No_CDM_Sizes` that has a column called *density,* that calculates the limpets per square meter for each transect. Remember that the transect included 1 meter on either side of the tape (total of 2 meters wide). Make sure to maintain the separation in year for the two Treasure Cove surveys using the `group_by()` function.
 
 ```{r}
-Limpet_Density <- No_CDM_Sizes |> 
-  
-  
 
+
+Limpet_Density <- No_CDM_Sizes |> 
+  select(site, year, transect_num, transect_length_m) |> 
+  group_by(transect_num, transect_length_m, year, site) |> 
+  summarize(count = n()) |> 
+  mutate(density = count /(transect_length_m*2))
+  
 Limpet_Density
 ```
 
