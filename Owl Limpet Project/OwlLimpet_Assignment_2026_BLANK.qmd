@@ -106,8 +106,6 @@ TransectLengths |> ggplot() +
   geom_boxplot()+
   geom_point(color = "firebrick3")
   
-
-  
   
 ```
 
@@ -187,14 +185,13 @@ Make a new dataframe out of the `No_CDM_Sizes` that has a column called *density
 
 ```{r}
 
-
 Limpet_Density <- No_CDM_Sizes |> 
   select(site, year, transect_num, transect_length_m) |> 
   group_by(transect_num, transect_length_m, year, site) |> 
   summarize(count = n()) |> 
   mutate(density = count /(transect_length_m*2))
   
-Limpet_Density
+print(Limpet_Density)
 ```
 
 Do you see any patterns just from examining this table of values?
@@ -204,23 +201,30 @@ Do you see any patterns just from examining this table of values?
 What was the mean limpets per square meter across all sites? And the standard deviation? And standard error?
 
 ```{r}
-Limpet_Density |> 
+total_mean_density <- mean(Limpet_Density$density)
+# The mean density across all sites is 3.378
 
+total_sd <- sd(Limpet_Density$density)
+# The standard deviation across all sites is 2.964
 
+total_standard_error <- total_sd/(sqrt(length(Limpet_Density$density)))
+# The standard error is 0.463
 ```
 
 Now create a summary table in which you calculate separate mean and standard deviation for each site and year (Shaws vs. Heisler vs. Treasure Cove)? What was the standard error? Round the mean and standard error to one decimal place. (look up the `round()` function!)
 
 ```{r}
 # use summarize() to calculate the mean and standard error (sd/sqrt(n)) for the two locations
+
 LimpetPopSummary <- Limpet_Density |>
+  group_by(year, site) |> 
+  summarize(mean_density = mean(density, na.rm = TRUE),
+            standard_error_density = (sd(density, na.rm = TRUE))/sqrt(n())) |> mutate(mean_density = round(mean_density, 1), standard_error_density = round(standard_error_density, 1))
   
-  
-  
-  
- 
-# Display your summary nicely using kable(). 
+LimpetPopSummary
+
 knitr::kable(LimpetPopSummary)
+
 ```
 
 #### 2.4 Make three graphs to visualize the difference in density between the two sites.
