@@ -233,7 +233,11 @@ Boxplot, using the `Limpet_density` object, using fill for year. Label the Y-axi
 
 ```{r}
 Limpet_Density |> ggplot() + 
- 
+ aes(x = site, y = density) +
+  geom_boxplot(aes(fill = year))+
+  ylab("Limpets per square meter")+
+  xlab("Site")
+  
   
 ```
 
@@ -241,23 +245,26 @@ A column plot with errorbars, and fill = year, using your new `LimpetPopSummary`
 
 ```{r}
 LimpetPopSummary |> ggplot()+
- 
+ aes(x = site, y = mean_density) +
+  geom_col(aes(fill = year))+
+  geom_errorbar(aes(ymin = -standard_error_density, ymax = standard_error_density))+
+  ylab("Limpets per square meter")+
+  xlab("Site")
   
-  
-
 ```
 
 A `geom_point()` or `geom_jitter()`plot to visualize individual transect density observations
 
 ```{r}
 Limpet_Density |> ggplot() + 
-  
-  
-  
+  aes(x = transect_num, y = density) +
+  geom_jitter()
   
 ```
 
 Which plot do you find the most informative and useful and why?
+
+I find the most useful plot to be the box and whisker plot, as it lets me quickly compare the mean of each site and identify any possible outliers.
 
 Based on these plots, does your data meet assumptions for a t-test?
 
@@ -271,12 +278,54 @@ T-Test assumptions (for a Student's T-test)
 
 - Is the distribution of the model residuals approximately normal?
 
+Yes, the data are continuous, the sample data was random, the variability of the data in each group is similar, and the distribution of the model appears normal.
+
 #### 2.5 What is the sample size (of transects) for each site/year for our study of limpet population density?
 
 Is it roughly the same so that we can compare? Is it enough to run a statistical test?
 
 ```{r}
 Limpet_Density |> 
+  filter(year == 2023, site == "Treasure Cove") |> 
+  count(transect_num) # 11
+
+Limpet_Density |>
+  filter(year == 2024, site == "Treasure Cove") |> 
+  count(transect_num) # 0
+
+Limpet_Density |> 
+  filter(year == 2025, site == "Treasure Cove") |> 
+  count(transect_num) # 12
+
+# There were a total of 23 transects for Treasure Cove
+
+Limpet_Density |> 
+  filter(year == 2023, site == "Heisler Park") |> 
+  count(transect_num) # 0 
+
+Limpet_Density |> 
+  filter(year == 2024, site == "Heisler Park") |> 
+  count(transect_num) # 9
+
+Limpet_Density |> 
+  filter(year == 2025, site == "Heisler Park") |> 
+  count(transect_num) # 0
+
+# There were a total of 9 transects for Heisler Park
+
+Limpet_Density |> 
+  filter(year == 2023, site == "Shaws Cove") |> 
+  count(transect_num) # 0
+
+Limpet_Density |> 
+  filter(year == 2024, site == "Shaws Cove") |> 
+  count(transect_num) # 9
+
+Limpet_Density |> 
+  filter(year == 2025, site == "Shaws Cove") |> 
+  count(transect_num) # 0 
+
+# There were a total of 9 transects for Heisler Park
 ```
 
 #### 2.6. Does average number of owl limpets per square meter differ significantly between Heisler Park and Shaws Cove?
@@ -286,20 +335,35 @@ Filter the data to only include those sites before putting it into the `t.test()
 ```{r t-test}
 # run a t-test on your count data from each site (Limpet_Density)
 ShawsHeislerDensity <- Limpet_Density |> 
+filter(site != "Treasure Cove")
 
 
-t.test(     , data = ShawsHeislerDensity)
+shaws_heisler_t_test <- t.test(density ~ site, data = ShawsHeislerDensity)
+#t = -1.1795, df = 14.36, p-value = 0.2574
 
+print(shaws_heisler_t_test)
 ```
 
 Explain the results of this t-test. Are you surprised by this result, given the figure you made above? Why do you think the results are what they are?
+
+The results indicate that the mean density of Owl Limpets is not statistically significantly different between the Shaws Cove and Heisler Park sites. This is because the p-value (p-value = 0.2574) is far greater than the accepted significant value of 0.05. These results are marginally surprising, as in the box and whisker plot, the mean density of limpets was higher at Shaws Cove when compared to the mean density of limpets at Heisler Park. When looking at the column plot however, the error bars overlap greatly, indicating that the density might not statistically significantly different.
 
 #### 2.7 Did Treasure Cove population density differ between the two sample years? Do a t-test and make a graph to complement presenting the result.
 
 ```{r}
 TC_density <- Limpet_Density |>
+  filter(site == "Treasure Cove")
 
-t.test(    )
+treasure_cove_t_test <- t.test(density ~ year, data = TC_density)
+# t = 0.85621, df = 20.662, p-value = 0.4017
+
+print(treasure_cove_t_test)
+
+ggplot(TC_density) +
+  aes(x = year, y = density) +
+  geom_boxplot() +
+  ylab("Limpets per square meter")+
+  xlab("Year")
 ```
 
 Since there was no difference in means, we'll ignore year at Treasure Cove from now on and just pool our data to make it easier for ourselves.
@@ -308,7 +372,16 @@ Since there was no difference in means, we'll ignore year at Treasure Cove from 
 
 ```{r}
 
+anova_data <- Limpet_Density |> 
+  filter(year != 2023)
+  
+  
+model <- lm(density ~ site, data = anova_data)
 
+ggplot(anova_data) +
+  aes(x = site, y = density)+
+  geom_boxplot()
+  
 ```
 
 ## Part 3: Size
