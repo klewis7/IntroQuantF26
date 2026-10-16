@@ -393,9 +393,12 @@ ggplot(anova_data) +
 ```{r summary statistics }
 # generate a nice table (like you did for counts, using kable() and round digits) with the mean shell length, standard deviation, and sample size of each site. Ignore transect. 
 
-SizeData_2022_2025 |> 
-
+SummaryTable <- SizeData_2022_2025 |> 
+  select(site, year, mean_shell_length |> 
+  summarize(count = n()) |> 
+  mutate(density = count /(transect_length_m*2)) 
   
+  SizeData_2022_2025
 ```
 
 ##### 3.1.2 Graph the shell lengths at each site using a boxplot. What do you observe?
