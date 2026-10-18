@@ -517,7 +517,14 @@ load(file = "Data/FenbergTerr.Rdata")
 ```{r}
 ## How many territories were measured at each site in each year? 
 Territories_SiteYear <- All_Territories |> 
-  select(site, year)
+  select(site, year) |> 
+  group_by(site, year) |> 
+  mutate(count = n()) |> 
+  distinct()
+# 51 territories were measured at Treasure Cove in 2023
+# 190 territories were measured at Treasure Cove in 2025
+# 83 territories were measured at Shaws Cove in 2024
+# 54 territories were measured at Heisler Park in 2024
 ```
 
 #### 4.3 Calculate meaningful variables from our measured values
@@ -530,6 +537,9 @@ Create new columns for:
 
 ```{r}
 All_Territories_area_mass <- All_Territories |> 
+  select(size_mm, numbsquares, site, year, habitat) |> 
+  mutate(area_mm2 = numbsquares*361) |> 
+  mutate(limpet_mass = 0.00009*size_mm ^ 3.0471)
   # create a new column for territory area in mm^2 using the "numbsquares" column
          # mesh = 19 mm x 19 mm 
 
@@ -547,20 +557,38 @@ Explore the relationship between mass_g, and area_mm2 using scatter plots.
 # plot size_mm vs area_mm2 scatterplot with best fit regression line, no SE zone, not separated by site
 All_Territories_area_mass |> 
   ggplot() + 
-  
+  aes(x = size_mm, y = area_mm2) +
+  geom_point()+
+geom_smooth(method = "lm", 
+            se = FALSE)+
+  ylab("Territory area (mm2)")+
+  xlab("Limpet size (mm)")
 ```
 
 ```{r}
 ## Scatter plot with site mapped to color
 All_Territories_area_mass |>
-  ggplot() + 
+  ggplot() +
+  aes(x = size_mm, y = area_mm2) +
+  geom_point(aes(color = site))+
+  geom_smooth(method = "lm", 
+              se = FALSE) +
+  ylab("Territory area (mm2)")+
+  xlab("Limpet size (mm)")
  
 ```
 
 ```{r}
 #  mass_g vs. area_mm2 scatterplot with best fit regression line, no SE zone, faceted by habitat
 All_Territories_area_mass |>
-  ggplot() + 
+  ggplot() +
+  aes(x = size_mm, y = area_mm2) +
+  geom_point(aes(color = site))+
+  geom_smooth(method = "lm", 
+              se = FALSE)+
+  facet_wrap(~habitat)+
+  ylab("Territory area (mm2)")+
+  xlab("Limpet size (mm)")
   
 ```
 
