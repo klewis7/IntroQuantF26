@@ -516,7 +516,8 @@ load(file = "Data/FenbergTerr.Rdata")
 
 ```{r}
 ## How many territories were measured at each site in each year? 
-All_Territories |> 
+Territories_SiteYear <- All_Territories |> 
+  select(site, year)
 ```
 
 #### 4.3 Calculate meaningful variables from our measured values
