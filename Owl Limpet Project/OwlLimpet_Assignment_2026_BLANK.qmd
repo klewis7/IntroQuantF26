@@ -658,9 +658,13 @@ All_Territories_area_mass |>
 
 linear_model <- lm(area_mm2 ~ limpet_mass, data = All_Territories_area_mass)
 
-
 plot(linear_model)
 View(linear_model)
+
+
+# In the residuals vs fitted plot, there are a lot of outliers, and the points make a funnel shape, indicating non-normal data
+
+# the QQ residuals plot shows points deviating from the line, indicating non-normal distribution
 ```
 
 One way to transform data that has this shape is to apply a log-transformation. Logarithmic relationships are common in biology for mass, volume, or other spatial relationships.
@@ -680,18 +684,22 @@ All_Territories_area_mass |> ggplot() +
 
 ```{r}
 # write the linear model object and examine the residual and QQ plots
-log_model <- lm(limpet_     )
+log_model <- lm(log(area_mm2) ~ log(limpet_mass), data = All_Territories_area_mass)
   
 plot(log_model, which = 1)
+# for residuals vs fitted, the points look equally distributed, indicating more normal data
 plot(log_model, which = 2)
+# in the QQ plot, the log transformed data follows the line much closer than the original plot, indicating more normal data
 ```
 
 #### 4.8. What is the formula for the best fit line for the relationship between territory size and body mass in owl limpets?
 
 ```{r linear regression test summary}
 
+summary(log_model)
 
-
+# int = 8.2116, slope = 0.8903, p-value = <2e-16 
+# formula for line = Y = 0.8903x + 8.2116
 ```
 
 **The formula for the best fit line can be extracted from the model summary. The two values in the Estimate column are the coefficients - (Intercept) gives the y-intercept, and the variable gives the slope.**
@@ -709,12 +717,17 @@ FenbergTerr
 
 # Plot the Fenberg data with the log transformations
 FenbergTerr |> ggplot() +
+  aes(x = log(mass_g), y = log(area_mm2))+
+  geom_point()+
+  geom_smooth(method = "lm", se = FALSE)
  
 
 # Find the slope and intercept of the best fit line
-Fenberg_model <- lm(   )
+Fenberg_model <- lm(log(area_mm2) ~ log(mass_g), data = FenbergTerr)
 
-
+summary(Fenberg_model)
+# int= 7.90973, slope = 0.89162, p-value= <2e-16
+# line formula = Y = 0.89162x + 7.90973
 ```
 
 Explain your findings!
