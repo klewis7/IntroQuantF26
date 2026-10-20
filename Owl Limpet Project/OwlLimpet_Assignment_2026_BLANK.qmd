@@ -660,7 +660,7 @@ linear_model <- lm(area_mm2 ~ limpet_mass, data = All_Territories_area_mass)
 
 
 plot(linear_model)
-Vire(linear_model)
+View(linear_model)
 ```
 
 One way to transform data that has this shape is to apply a log-transformation. Logarithmic relationships are common in biology for mass, volume, or other spatial relationships.
@@ -671,12 +671,16 @@ One way to transform data that has this shape is to apply a log-transformation. 
 # plot a scatterplot log area on y axis by log mass_g on x axis, best fit regression line but no SE interval
 
 All_Territories_area_mass |> ggplot() + 
+  aes(x = log(limpet_mass), y = log(area_mm2))+
+  geom_point()+
+  geom_smooth(method = "lm", se = FALSE)
 
+# within the aes, log() allows us to log transform the two variables
 ```
 
 ```{r}
 # write the linear model object and examine the residual and QQ plots
-log_model <- lm(     )
+log_model <- lm(limpet_     )
   
 plot(log_model, which = 1)
 plot(log_model, which = 2)
