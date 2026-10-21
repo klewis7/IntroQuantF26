@@ -15,6 +15,14 @@ library(readxl)
 
 ## Project Summary:
 
+The following analysis investigates three key characteristics of owl limpet populations at a variety of sites within the Crystal Cove State Marine Conservation Area. The data included was collected from 2023-2025, spanning three different sites within the area: Treasure Cove, Heisler Park, and Shaws Cove. As each site recieves varying visitation rates by the public, we aim to discover if there is variation in limpet characteristics between sites.
+
+The main objectives of the study are to determine the population density of limpets at each site, compare limpet sizes between each site, and to investigate the territory sizes of limpets at each site. To complete these objectives, limpet shell size, territory area, and habitat type were recorded for all limpets found on pre-selected transects within the sites.
+
+To determine population density, the number of limpets per transect area was calculated, and t-tests were run to determine if the density varied significantly between sites. When investigating limpet size, the mean size was compared between higher and lower impact sites using t-tests. Finally, the relationship between limpet size and territory area was examined through linear regression modeling.
+
+At each site, the shell size,
+
 *Once you have completed this entire assignment, come back and write a project summary here that covers the aims, research questions, and basic methods of this study.*
 
 You have been given data from several locations and survey years:
@@ -351,7 +359,7 @@ Explain the results of this t-test. Are you surprised by this result, given the 
 
 The results indicate that the mean density of Owl Limpets is not statistically significantly different between the Shaws Cove and Heisler Park sites. This is because the p-value (p-value = 0.2574) is far greater than the accepted significant value of 0.05.
 
-These results are not surprising when we look at the figures created prior to running the test. When looking at the column plot, the error bars for the selected sites overlap, indicating that the density might not statistically significantly different.
+These results are not surprising when we look at the figures created prior to running the test. When looking at the column plot, the error bars for the selected sites overlap, indicating that the density might not statistically significantly different. Limpet density does not significantly vary between Shaws Cove and Heisler Park as they receive relatively similar levels of anthropogenic disturbance.
 
 #### 2.7 Did Treasure Cove population density differ between the two sample years? Do a t-test and make a graph to complement presenting the result.
 
@@ -521,7 +529,55 @@ If you would like to test whether size differs by predicted human impact, at CDM
 
 ```{r}
 
+HP_SC_Sizes <- SizeData_2022_2025 |>
+  select(site, shell_length_mm) |> 
+  filter(site == "Heisler Park" | site == "Shaws Cove")
+
+# this filter selects data where the site is equal to Heisler Park or Shaws Cove
+
+# set the linear model for testing the assumptions
+HPSCmodel <- lm(shell_length_mm ~ site, data = HP_SC_Sizes)
+
+# this model evaluates shell length as a function of site
+
+# Examine plot of Residuals vs. Fitted values
+plot(HPSCmodel, which = 1)
+
+# F-test for homogeneity of variance - if p-value < 0.05 then variances are different. 
+var.test(shell_length_mm ~ site, data = HP_SC_Sizes)
+# the p-value is less than 0.05 (p-value < 2.2e-16), indicating different variances between groups
+# I can still continue with the t-test though, as Welch's can be used with unequal variances 
+
+## Test for normality
+
+# examine a QQ-plot
+plot(HPSCmodel, which = 2)
+
+# the residuals stray from the line, indicating non-normality
+
+# conduct a Shapiro-Wilk test on the residuals
+shapiro.test(HPSCmodel$residuals)
+# W = 0.97718, p-value = 1.824e-13
+
+# the p-value is less than 0.05 (p-value = 1.824e-13), indicating that the model residuals are not normally distributed
+# I can still continue as the shapiro test can be overly sensitive with a large sample size
+
+t.test(shell_length_mm ~ site, data = HP_SC_Sizes)
+#t = 12.361, df = 714.03, p-value < 2.2e-16
+
+#p-value less than 0.05 indicates a statistically significant difference between mean shell lenghts between Heisler Park limpets and Shaws Cove limpets 
+HP_SC_Sizes |>
+  group_by(site) |> 
+  summarize(mean_length = mean(shell_length_mm, na.rm = TRUE),
+            standard_error_length = (sd(shell_length_mm, na.rm = TRUE))/sqrt(n())) |> ggplot()+
+  aes(x = site, y = mean_length) +
+  geom_col() +
+  geom_errorbar(aes(ymin = mean_length - standard_error_length, ymax = mean_length + standard_error_length))+
+  ylab("Mean shell length (mm)")+
+  xlab("Site")
 ```
+
+After comparing the mean sizes of limpets at Heisler Park and Shaws Cove, we cannot uphold the assumption that a lower impact site leads to greater shell length. The limpets within the greater impact site, Heisler Park, had statistically significantly higher shell lenghts than those within the lower impact site, Shaws Cove. This indicates that there is an unknown variable affecting the shell lengths between Heisler Park and Shaws Cove.
 
 #### 3.6. MORE EXTRA CREDIT: conduct an ANOVA to test for differences in shell length between all four sites. Show your tests for all assumptions and make a graph.
 
@@ -732,7 +788,9 @@ summary(Fenberg_model)
 
 Explain your findings!
 
-### Part 5: EXTRA CREDIT:
+When looking at limpet mass and territory area at the local sites, there is a statistically significant relationship between the two variables as shown by an extremely low p-value (p-value \< 2e-16). The line of best fit is clearly positive with a slope close to 1, showing that an increase in limpet mass corresponds with an increase in territory area. These findings coincide with those of the Fenberg data, as the lines of best fit are quite similar. The slope of the Fenberg line (0.89162), is almost identical to the slope of our data's line (0.8903), indicating a similar relationship in limpet mass and territory area between both data-sets.
+
+Part 5: EXTRA CREDIT:
 
 #### 5.1 Calculate the slope of best fit regression separately for each site.
 
