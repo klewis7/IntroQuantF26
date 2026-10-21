@@ -21,8 +21,6 @@ The main objectives of the study are to determine the population density of limp
 
 To determine population density, the number of limpets per transect area was calculated, and t-tests were run to determine if the density varied significantly between sites. When investigating limpet size, the mean size was compared between higher and lower impact sites using t-tests. Finally, the relationship between limpet size and territory area was examined through linear regression modeling.
 
-At each site, the shell size,
-
 *Once you have completed this entire assignment, come back and write a project summary here that covers the aims, research questions, and basic methods of this study.*
 
 You have been given data from several locations and survey years:
@@ -333,6 +331,8 @@ Limpet_Density |>
 # There were a total of 9 transects for Heisler Park (2024)
 # There were a total of 9 transects for Shaws Cove (2024)
 # There were a total of 11 transects for Treasure Cove in 2023 and 12 transects for Treasure Cove in 2025
+
+# Heisler Park and Shaws Cove are the ideal sites to compare as they have the same amount of transects, yes there are enough data between those sites to run a statistical test
 ```
 
 #### 2.6. Does average number of owl limpets per square meter differ significantly between Heisler Park and Shaws Cove?
@@ -413,7 +413,7 @@ kable()
 # I then used summarize to calculate the standard deviation of the length, using na.rm = TRUE to exclude NA values
 # mutate was then used to round the standard deviation lengths to one decimal point, and kable was used to create a neater table
   
-SummaryTable
+print(SummaryTable)
 ```
 
 ##### 3.1.2 Graph the shell lengths at each site using a boxplot. What do you observe?
@@ -708,6 +708,13 @@ All_Territories_area_mass |>
 
 #### 4.6. What important assumptions of tests of linear regression do these scatter plots fail? How can you tell?
 
+Linear regression assumes that:
+
+1.  At each value of x, there is a population of possible y values whose mean lies on the true regression line
+2.  At each value of x, the distribution of y values is normal
+3.  The variance of y values is the same at all values of x
+4.  At each value of x, the y measurements represent a random sample from the population of possible y values
+
 ```{r}
 
 # write a linear model for the relationship, then use the plot() function on the model object to show the residuals vs. fitted values and QQ plots to assess your regression. 
@@ -717,10 +724,10 @@ linear_model <- lm(area_mm2 ~ limpet_mass, data = All_Territories_area_mass)
 plot(linear_model)
 View(linear_model)
 
+# In the residuals vs fitted plot, there are a lot of outliers, and the points make a funnel shape, this fails the linearity assumption (assumption 1)
 
-# In the residuals vs fitted plot, there are a lot of outliers, and the points make a funnel shape, indicating non-normal data
+# the QQ residuals plot shows points deviating from the line, indicating a skewed distribution, failing the normality assumption (assumption 2)
 
-# the QQ residuals plot shows points deviating from the line, indicating non-normal distribution
 ```
 
 One way to transform data that has this shape is to apply a log-transformation. Logarithmic relationships are common in biology for mass, volume, or other spatial relationships.
@@ -736,6 +743,7 @@ All_Territories_area_mass |> ggplot() +
   geom_smooth(method = "lm", se = FALSE)
 
 # within the aes, log() allows us to log transform the two variables
+# this relationship does meet assumptions, indicating a positive correlation between limpet mass and territory area
 ```
 
 ```{r}
@@ -743,9 +751,9 @@ All_Territories_area_mass |> ggplot() +
 log_model <- lm(log(area_mm2) ~ log(limpet_mass), data = All_Territories_area_mass)
   
 plot(log_model, which = 1)
-# for residuals vs fitted, the points look equally distributed, indicating more normal data
+# for residuals vs fitted, the points look equally distributed, indicating a possible linear relationship
 plot(log_model, which = 2)
-# in the QQ plot, the log transformed data follows the line much closer than the original plot, indicating more normal data
+# in the QQ plot, the log transformed data follows the line much closer than the original plot, indicating more normally distributed data
 ```
 
 #### 4.8. What is the formula for the best fit line for the relationship between territory size and body mass in owl limpets?
