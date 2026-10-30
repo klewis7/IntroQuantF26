@@ -154,19 +154,23 @@ Check out the illustrative animations on this page: <https://github.com/gadenbui
 ```{r}
 LICOR_Data <- LICOR_Data_Raw |> 
   select(SYS_Date_YYYYMMDD, `USERDEF_Block Number_NA`, `USERDEF_Tag Number_NA`, Treatment_NA_NA, Sapling_AB_etc_NA_NA, Dead_Alive_NA_NA, `PORO_gsw_mol+1m-2s-1`) |> 
+  # rename columns
   rename(date = SYS_Date_YYYYMMDD, 
          block_number = `USERDEF_Block Number_NA`, 
          tag_number = `USERDEF_Tag Number_NA`, 
          treatment = Treatment_NA_NA,
          sapling_id = Sapling_AB_etc_NA_NA, 
-         dead_alive = Dead_Alive_NA_NA,
-         stomatal_conductance = `PORO_gsw_mol+1m-2s-1`)
-  
-  # use notes like this to create a checklist of the things that need to be fixed, then you can fill in code between each line as you fix them. 
+         status = Dead_Alive_NA_NA,
+         gsw = `PORO_gsw_mol+1m-2s-1`) |> 
+  # remove 'dead' saplings 
+filter(status != "Dead" )
+# checking classes of variables, changing to what they need to be for analysis
+class(LICOR_Data$gsw)
+class(LICOR_Data$treatment)
+LICOR_Data$gsw <- as.numeric(LICOR_Data$gsw)
+LICOR_Data$treatment <- as.factor(LICOR_Data$treatment)
 
-  # Thing to fix #2
 
-  # Thing to fix #3
 ```
 
 ### Regression dataset
