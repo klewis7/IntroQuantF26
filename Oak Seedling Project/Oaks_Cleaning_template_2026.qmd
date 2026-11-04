@@ -140,7 +140,9 @@ In this section we will look at and clean up each of the data sets you identifie
 You may be either examining `SPAD_Data_Raw`, `Height_Data_Raw`, `LICOR_Data_Raw`, or `Moist_Data_Raw` for your ANOVA question. Examine your data set using the diagnostic functions I've given you above in the How to Examine and Clean Data section.
 
 ```{r}
+# I want to look at treatment and LICOR, so I will load the LICOR data to be cleaned 
 
+View(LICOR_Data_Raw)
 ```
 
 In this next chunk, generate a cleaned data set following the example below. As you examine your raw data and find things to fix, add a #Note to create a list of things to fix up. You can then use pipes and write code to fix each thing in your checklist. This is also where if you identified `filters` or data computations in your Hypothesis worksheet (e.g., choose only one species), you can apply those.
@@ -181,6 +183,11 @@ Repeat the steps you took for your ANOVA data for your second data set of choice
 
 ```{r}
 # View data set
+
+View(Moist_Data_Raw)
+View(LICOR_Data)
+
+# I will need to clean the moisture data and combine it with the cleaned LICOR data
 ```
 
 ```{r}
@@ -188,6 +195,7 @@ Repeat the steps you took for your ANOVA data for your second data set of choice
 # select what columns I want
 Moist_Data <- Moist_Data_Raw |> 
   select(Block, Treatment, VWC1_perc, VWC2_perc, VWC3_perc) |> 
+  # remove NA rows
   na.omit() |> 
   
 # rename columns
@@ -210,10 +218,6 @@ Moist_Data <- Moist_Data |>
   
 # join LICOR and moisture data 
 LICOR_Moist_DATA<- full_join(Moist_Data, LICOR_Data, by = c("Treatment", "Block"), relationship = "many-to-many")
-  
-  
-  
-
 
 ```
 
@@ -236,11 +240,13 @@ Go for it!
 ```{r}
 
 
+# Let's see if we can see a relationship between soil moisture and stomatal conductance 
+
 ggplot(LICOR_Moist_DATA) +
   aes(x = VWC_mean, y = GSW)+
   geom_point()
 
-# everything is smushed at the top, I want to remove outliers
+# Everything is smushed at the top, I want to remove outliers so I can see my points more easily
 
 LICOR_Moist_Graphing <- LICOR_Moist_DATA[-c(94, 95), ]
 
@@ -249,14 +255,14 @@ ggplot(LICOR_Moist_Graphing) +
   aes(x = VWC_mean, y = GSW)+
   geom_point()
 
-# these seem pretty spread out, soil moisture might have varied a lot due to rain event between sampling days, I want to separate by date
+# These seem pretty spread out with no obvious linear relationship. Soil moisture might have varied a lot due to the rain event between sampling days, I now want to separate by date
 
 ggplot(LICOR_Moist_Graphing) +
-  aes(x = VWC_mean, y = GSW)
+  aes(x = VWC_mean, y = GSW)+
   geom_point() +
   facet_wrap(~Date)
 
-# let's look at GSW across treatments 
+# Let's look at stomatal conductance across treatments 
 
 ggplot(LICOR_Data)+
   aes(x = Treatment, y = GSW,)+
@@ -270,15 +276,40 @@ ggplot(LICOR_Graphing)+
   aes(x = Treatment, y = GSW,)+
   geom_boxplot()
 
-# does sampling date affect these values?
+# Does sampling date affect these values?
 ggplot(LICOR_Graphing)+
   aes(x = Treatment, y = GSW, fill = Date)+
   geom_boxplot()
+# Maybe not? The means look pretty similar between both sampling dates 
+
+# How is the stomatal conductance data distributed after removing the outliers
+ggplot(LICOR_Moist_Graphing)+
+  aes(x = GSW)+
+  geom_histogram()
+# Not bad, maybe a little skewed to the left and narrow
+
+# How is the soil moisture data distributed?
+ggplot(LICOR_Moist_Graphing)+
+  aes(VWC_mean)+
+  geom_histogram()
+# Not normal looking! Less bins?
+ggplot(LICOR_Moist_Graphing)+
+  aes(VWC_mean)+
+  geom_histogram(bins = 20)
+# Nope, still weird, it looks like it could be bimodal-ish? which might make sense considering the environmental differences between sampling dates, let's separate by sampling date
+
+ggplot(LICOR_Moist_Graphing)+
+  aes(VWC_mean)+
+  geom_histogram(bins = 25)+
+  facet_wrap(~Date)
+# Seems like a sharper left-skewed distribution on the first (dry) date, and a more gradual right-skewed distribution on the second (post-rain) date
+
 
 # let's look at the porosity and soil moisture separated by treatment 
 ggplot(LICOR_Moist_Graphing) +
   aes(x = VWC_mean, y = GSW, color = Date)+
 geom_point()+
   facet_wrap(~Treatment)
+# Sampling date does seem to be a major factor affecting the distribution of the data
 
 ```
