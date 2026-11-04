@@ -155,20 +155,22 @@ Check out the illustrative animations on this page: <https://github.com/gadenbui
 LICOR_Data <- LICOR_Data_Raw |> 
   select(SYS_Date_YYYYMMDD, `USERDEF_Block Number_NA`, `USERDEF_Tag Number_NA`, Treatment_NA_NA, Sapling_AB_etc_NA_NA, Dead_Alive_NA_NA, `PORO_gsw_mol+1m-2s-1`) |> 
   # rename columns
-  rename(date = SYS_Date_YYYYMMDD, 
-         block_number = `USERDEF_Block Number_NA`, 
-         tag_number = `USERDEF_Tag Number_NA`, 
-         treatment = Treatment_NA_NA,
-         sapling_id = Sapling_AB_etc_NA_NA, 
-         status = Dead_Alive_NA_NA,
-         gsw = `PORO_gsw_mol+1m-2s-1`) |> 
+  rename(Date = SYS_Date_YYYYMMDD, 
+         Block = `USERDEF_Block Number_NA`, 
+         Tag = `USERDEF_Tag Number_NA`, 
+         Treatment = Treatment_NA_NA,
+         Sapling_ID = Sapling_AB_etc_NA_NA, 
+         Status = Dead_Alive_NA_NA,
+         GSW = `PORO_gsw_mol+1m-2s-1`) |> 
   # remove 'dead' saplings 
-filter(status != "Dead" )
+filter(Status != "Dead" )
 # checking classes of variables, changing to what they need to be for analysis
-class(LICOR_Data$gsw)
-class(LICOR_Data$treatment)
-LICOR_Data$gsw <- as.numeric(LICOR_Data$gsw)
-LICOR_Data$treatment <- as.factor(LICOR_Data$treatment)
+class(LICOR_Data$GSW)
+class(LICOR_Data$Treatment)
+LICOR_Data$GSW <- as.numeric(LICOR_Data$GSW)
+LICOR_Data$Treatment <- as.factor(LICOR_Data$Treatment)
+
+LICOR_Data$Date <- as.character(LICOR_Data$Date)
 
 
 ```
@@ -182,9 +184,37 @@ Repeat the steps you took for your ANOVA data for your second data set of choice
 ```
 
 ```{r}
-Data <- _Raw |> 
-   
-  #Things to Fix
+
+# select what columns I want
+Moist_Data <- Moist_Data_Raw |> 
+  select(Block, Treatment, VWC1_perc, VWC2_perc, VWC3_perc) |> 
+  na.omit() |> 
+  
+# rename columns
+  rename(VWC_1 = VWC1_perc, 
+         VWC_2 = VWC2_perc, 
+         VWC_3 = VWC3_perc)
+  
+# change classes of columns 
+Moist_Data$VWC_1 <- as.numeric(Moist_Data$VWC_1)
+Moist_Data$VWC_2 <- as.numeric(Moist_Data$VWC_2)
+Moist_Data$VWC_3 <- as.numeric(Moist_Data$VWC_3)
+
+Moist_Data$Block <- as.factor(Moist_Data$Block)
+Moist_Data$Treatment <- as.factor(Moist_Data$Treatment)
+
+  
+# create a mean colum for VWC
+Moist_Data <- Moist_Data |> 
+  mutate(VWC_mean = rowMeans(pick(VWC_1, VWC_2, VWC_3), na.rm = TRUE)) 
+  
+# join LICOR and moisture data 
+LICOR_Moist_DATA<- full_join(Moist_Data, LICOR_Data, by = c("Treatment", "Block"), relationship = "many-to-many")
+  
+  
+  
+
+
 ```
 
 ## Exploratory Data Analysis
@@ -204,5 +234,51 @@ Not sure where to start?
 Go for it!
 
 ```{r}
+
+
+ggplot(LICOR_Moist_DATA) +
+  aes(x = VWC_mean, y = GSW)+
+  geom_point()
+
+# everything is smushed at the top, I want to remove outliers
+
+LICOR_Moist_Graphing <- LICOR_Moist_DATA[-c(94, 95), ]
+
+  
+ggplot(LICOR_Moist_Graphing) +
+  aes(x = VWC_mean, y = GSW)+
+  geom_point()
+
+# these seem pretty spread out, soil moisture might have varied a lot due to rain event between sampling days, I want to separate by date
+
+ggplot(LICOR_Moist_Graphing) +
+  aes(x = VWC_mean, y = GSW)
+  geom_point() +
+  facet_wrap(~Date)
+
+# let's look at GSW across treatments 
+
+ggplot(LICOR_Data)+
+  aes(x = Treatment, y = GSW,)+
+  geom_boxplot()
+
+# It's squished here again, lets remove those same two datapoints
+
+LICOR_Graphing <- LICOR_Data[-c(72, 73), ]
+
+ggplot(LICOR_Graphing)+
+  aes(x = Treatment, y = GSW,)+
+  geom_boxplot()
+
+# does sampling date affect these values?
+ggplot(LICOR_Graphing)+
+  aes(x = Treatment, y = GSW, fill = Date)+
+  geom_boxplot()
+
+# let's look at the porosity and soil moisture separated by treatment 
+ggplot(LICOR_Moist_Graphing) +
+  aes(x = VWC_mean, y = GSW, color = Date)+
+geom_point()+
+  facet_wrap(~Treatment)
 
 ```
