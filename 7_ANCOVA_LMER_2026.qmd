@@ -1,4 +1,6 @@
 ---
+
+---
 title: "ANCOVA and Mixed Effects Models Demo"
 format: html
 editor: visual
