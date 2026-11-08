@@ -1,0 +1,162 @@
+---
+title: "Oaks_Rough_Analysis"
+format: html
+editor: visual
+---
+
+# Oaks Rough Draft Analysis
+
+```{r}
+# load packages
+library(tidyverse)
+library(readxl)
+```
+
+```{r}
+# read in data
+Height_Data_Raw <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx", 
+             sheet = "Seedling Heights")
+
+Moist_Data_Raw <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx", 
+             sheet = "Soil Moisture")
+
+SPAD_Data_Raw <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx", 
+             sheet = "SPAD", 
+             na = "NA")
+LICOR_Data_Raw_NAMES <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx",              
+             sheet = "LICOR", 
+             n_max = 3, 
+             col_names = FALSE, 
+             col_types = "text") |> 
+  summarise(across(.fns = paste, collapse = "_")) |> 
+  unlist() |> 
+  unname()
+
+LICOR_Data_Raw <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx",  
+             sheet = "LICOR", 
+             skip = 3, 
+             col_names = LICOR_Data_Raw_NAMES,
+             col_types = "text")
+
+
+ALL_Licor_NAMES <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx", 
+             sheet = "ALL_Licor_Ignore", 
+             n_max = 3, 
+             col_names = FALSE, 
+             col_types = "text") |> 
+  summarise(across(.fns = paste, collapse = "_")) |> 
+  unlist() |> 
+  unname()
+
+ALL_Licor <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx", 
+             sheet = "ALL_Licor_Ignore", 
+             skip = 3, 
+             col_names = ALL_Licor_NAMES, 
+             col_types = "text")
+
+LICOR_Data_Raw <- full_join(LICOR_Data_Raw, ALL_Licor)
+```
+
+## Data Cleaning
+
+```{r}
+# Clean LICOR data for ANOVA
+LICOR_Data <- LICOR_Data_Raw |> 
+  select(SYS_Date_YYYYMMDD, `USERDEF_Block Number_NA`, `USERDEF_Tag Number_NA`, Treatment_NA_NA, Sapling_AB_etc_NA_NA, Dead_Alive_NA_NA, `PORO_gsw_mol+1m-2s-1`) |> 
+  
+# Rename columns
+  rename(Date = SYS_Date_YYYYMMDD, 
+         Block = `USERDEF_Block Number_NA`, 
+         Tag = `USERDEF_Tag Number_NA`, 
+         Treatment = Treatment_NA_NA,
+         Sapling_ID = Sapling_AB_etc_NA_NA, 
+         Status = Dead_Alive_NA_NA,
+         GSW = `PORO_gsw_mol+1m-2s-1`) |> 
+  
+# Remove 'dead' saplings 
+  filter(Status != "Dead" )
+
+# Checking classes of variables, changing to what they need to be for analysis
+
+class(LICOR_Data$GSW)
+class(LICOR_Data$Treatment)
+
+LICOR_Data$GSW <- as.numeric(LICOR_Data$GSW)
+LICOR_Data$Treatment <- as.factor(LICOR_Data$Treatment)
+
+LICOR_Data$Date <- as.character(LICOR_Data$Date)
+
+```
+
+```{r}
+# Clean moisture data and combine with LICOR data for regression
+
+# Select what columns I want
+Moist_Data <- Moist_Data_Raw |> 
+  select(Block, Treatment, VWC1_perc, VWC2_perc, VWC3_perc) |> 
+  # remove NA rows
+  na.omit() |> 
+  
+  # rename columns
+  rename(VWC_1 = VWC1_perc, 
+         VWC_2 = VWC2_perc, 
+         VWC_3 = VWC3_perc)
+
+# change classes of columns 
+Moist_Data$VWC_1 <- as.numeric(Moist_Data$VWC_1)
+Moist_Data$VWC_2 <- as.numeric(Moist_Data$VWC_2)
+Moist_Data$VWC_3 <- as.numeric(Moist_Data$VWC_3)
+
+Moist_Data$Block <- as.factor(Moist_Data$Block)
+Moist_Data$Treatment <- as.factor(Moist_Data$Treatment)
+
+# create a mean colum for VWC
+Moist_Data <- Moist_Data |> 
+  mutate(VWC_mean = rowMeans(pick(VWC_1, VWC_2, VWC_3), na.rm = TRUE)) 
+
+# join LICOR and moisture data 
+LICOR_Moist_DATA<- full_join(Moist_Data, LICOR_Data, by = c("Treatment", "Block"), relationship = "many-to-many")
+```
+
+## ANOVA
+
+```{r}
+# assumption/normality tests
+```
+
+```{r}
+# anova
+```
+
+```{r}
+# post hoc
+```
+
+```{r}
+# figure
+```
+
+## Regression
+
+```{r}
+# assumption/normality tests
+```
+
+```{r}
+# regression
+```
+
+```{r}
+# post hoc
+```
+
+```{r}
+# figure
+```
