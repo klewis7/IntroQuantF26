@@ -183,39 +183,62 @@ bartlett.test(GSW ~ Treatment, data = LICOR_anova)
 # Bartlett's K-squared = 40.714, df = 4, p-value = 3.08e-08
 # p-value is extremely low, indicating variance between treatments, I will now try to transform the data 
 
+LICOR_anova |> 
+  group_by(Treatment) |> 
+  summarize(Count = n())
+
 # transform data to see if that helps normality and HOV
 anova_model3 <- lm(log(GSW) ~ Treatment, data = LICOR_anova)
 
 plot(anova_model3, which = 2)
 plot(anova_model3, 1)
-# both plots look worse than the untransformed data, so I will run the ANOVA as welch's since there is unequal variances among groups 
+# both plots look worse than the untransformed data 
+
+LICOR_anova |> 
+  group_by(Treatment) |> 
+  summarize(Count = n())
+# sample sizes are relatively even among groups, so I can ignore the assumption of homogeneity of variance 
+
 ```
 
-### One-Way Welch's ANOVA (Unequal Variances)
+### One-Way ANOVA and Post-Hoc Test
 
 ```{r}
-# Running Welch's ANOVA
+# Running ANOVA
 
-oneway.test(GSW ~ Treatment, data = LICOR_anova, var.equal = FALSE)
+anova(anova_model2)
+# p = 0.009787 
 
-# F = 1.8511, num df = 4.000, denom df = 15.254, p-value = 0.1708
-# There is no need for post hoc testing as the result is statistically insignificant
+# TukeyHSD post hoc
+TukeyHSD( aov(GSW ~ Treatment, data = LICOR_anova) )
+
+# OS-DT = 0.0082704
+# OS-NR = 0.0146241
 ```
 
 ### Figure
 
 ```{r}
 
-ggplot(LICOR_anova)+
-  aes(x = Treatment, y = GSW, color = Treatment)+
-  geom_boxplot(alpha = 0.5)+
-  geom_jitter(width = 0.2, size = 1.5, alpha = 0.7)+
-  annotate("text", x = 2, y = 0.15, label = "Welch's ANOVA, p-value = 0.1708", fontface = "bold")+
-  ylab("Stomatal Conductance (mmol m −2 s −1)")+
-  theme(legend.position = "none")+
-  ggtitle("Stomatal conductance of oak seedlings across treatments")
+anova_summary <- LICOR_anova |> 
+  group_by(Treatment) |>
+  filter(Treatment != "??")|> 
+  summarise(mean = mean(GSW), 
+            se = sd(GSW)/sqrt(n()))
 
-# I created a boxplot with a jitter to show the means of each group mapped against the variance.  
+ggplot(anova_summary) + 
+  aes(x = Treatment, y = mean, fill = Treatment) + 
+  geom_col() + 
+  geom_errorbar(aes(ymin = (mean - se), ymax = (mean + se)), width = 0.2)+
+  annotate("text", x = 1.5, y = -0.02, label = "p = 0.009787", fontface = "bold", size = 4.5)+
+  ylab("Mean Stomatal Conductance (mmol m −2 s −1)")+
+  theme(legend.position = "none")+
+  ggtitle("Stomatal conductance of oak seedlings across treatments")+
+  geom_text(label = c("ABC", "AB", "AB", "C"), 
+            aes(y = 0.020, x = Treatment),
+            vjust = -0.5, 
+            size = 4.5)+ 
+      ylim(-.035, 0.025)
 ```
 
 ## Regression
@@ -275,7 +298,7 @@ plot(LICOR_Moist_model2, 1)
 
 ```
 
-### Spearman's Rank Test 
+### Spearman's Rank Test
 
 ```{r}
 
