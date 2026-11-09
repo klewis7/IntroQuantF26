@@ -129,18 +129,75 @@ LICOR_Moist_DATA<- full_join(Moist_Data, LICOR_Data, by = c("Treatment", "Block"
 
 ```{r}
 # assumption/normality tests
+
+# visualizing stomatal conductance across treatments 
+
+ggplot(LICOR_Data)+
+  aes(x = Treatment, y = GSW,)+
+  geom_boxplot()
+
+# removing two obvious outliers
+
+LICOR_Graphing <- LICOR_Data[-c(72, 73), ]
+
+ggplot(LICOR_Graphing)+
+  aes(x = Treatment, y = GSW,)+
+  geom_boxplot()
+
+# write the model 
+
+anova_model <- lm(GSW ~ Treatment, data = LICOR_Graphing)
+
+# checking q-q residuals
+plot(anova_model, which = 2)
+
+# shapiro test
+shapiro.test(anova_model$residuals)
+
+# testing for homogeneity of variance 
+plot(anova_model, 1)
+
+# Some outliers keep getting pointed out
+LICOR_anova <- LICOR_Graphing[-c(2, 66, 67), ]
+
+anova_model2 <- lm(GSW ~ Treatment, data = LICOR_anova)
+
+plot(anova_model2, which = 2)
+plot(anova_model2, 1)
+
+# bartlett test
+bartlett.test(GSW ~ Treatment, data = LICOR_anova)
+
+# transform data to see if that helps normality and HOV
+anova_model3 <- lm(log(GSW) ~ Treatment, data = LICOR_anova)
+
+plot(anova_model3, which = 2)
+plot(anova_model3, 1)
+
+# this looks worse than the original, so I will run the ANOVA as welch's since there is unequal variances among groups 
 ```
 
 ```{r}
 # anova
-```
 
-```{r}
-# post hoc
+oneway.test(GSW ~ Treatment, data = LICOR_anova, var.equal = FALSE)
+
+# F = 1.8511, num df = 4.000, denom df = 15.254, p-value = 0.1708
+# there is no need for post hoc testing as the result is insignificant
 ```
 
 ```{r}
 # figure
+ggplot(LICOR_anova)+
+  aes(x = Treatment, y = GSW, color = Treatment)+
+  geom_boxplot(alpha = 0.5)+
+  geom_jitter(width = 0.2, size = 1.5, alpha = 0.7)+
+  annotate("text", x = 2, y = 0.15, label = "Welch's ANOVA, p-value = 0.1708", fontface = "bold")+
+  ylab("Stomatal Conductance (mmol m −2 s −1)")+
+  theme(legend.position = "none")+
+  ggtitle("Stomatal conductance of oak seedlings across treatments")
+
+# I created a boxplot with a jitter to show the means of each group mapped against the variance.  
 ```
 
 ## Regression
