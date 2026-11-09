@@ -127,35 +127,46 @@ LICOR_Moist_DATA<- full_join(Moist_Data, LICOR_Data, by = c("Treatment", "Block"
 
 ## ANOVA
 
+Does treatment influence stomatal conductance of Oak seedlings?
+
+### Checking for Normality and Assumptions
+
 ```{r}
 # assumption/normality tests
 
 # visualizing stomatal conductance across treatments 
-
 ggplot(LICOR_Data)+
   aes(x = Treatment, y = GSW,)+
   geom_boxplot()
 
 # removing two obvious outliers
-
 LICOR_Graphing <- LICOR_Data[-c(72, 73), ]
 
 ggplot(LICOR_Graphing)+
   aes(x = Treatment, y = GSW,)+
   geom_boxplot()
 
-# write the model 
+# exmaining distribution
+ggplot(LICOR_Graphing)+
+  aes(x = GSW)+
+  geom_histogram()
+# data appears normal
 
+# write the model 
 anova_model <- lm(GSW ~ Treatment, data = LICOR_Graphing)
 
 # checking q-q residuals
 plot(anova_model, which = 2)
+# the majority of the residuals follow the trendline, so I will continue
 
 # shapiro test
 shapiro.test(anova_model$residuals)
+# W = 0.86233, p-value = 5.643e-13
+# this indicates abnormality (p < 0.05) in the data, but this test is highly sensitive with large sample sizes so I will continue
 
 # testing for homogeneity of variance 
 plot(anova_model, 1)
+# the residuals are highly variable, so I might try removing more outliers and/or transforming the data
 
 # Some outliers keep getting pointed out
 LICOR_anova <- LICOR_Graphing[-c(2, 66, 67), ]
@@ -163,31 +174,38 @@ LICOR_anova <- LICOR_Graphing[-c(2, 66, 67), ]
 anova_model2 <- lm(GSW ~ Treatment, data = LICOR_anova)
 
 plot(anova_model2, which = 2)
+# this plot looks better, the residuals follow a more linear path
 plot(anova_model2, 1)
+# this plot looks slightly better, but there is still heterogeneity of variances, I will do a bartlett test
 
 # bartlett test
 bartlett.test(GSW ~ Treatment, data = LICOR_anova)
+# Bartlett's K-squared = 40.714, df = 4, p-value = 3.08e-08
+# p-value is extremely low, indicating variance between treatments, I will now try to transform the data 
 
 # transform data to see if that helps normality and HOV
 anova_model3 <- lm(log(GSW) ~ Treatment, data = LICOR_anova)
 
 plot(anova_model3, which = 2)
 plot(anova_model3, 1)
-
-# this looks worse than the original, so I will run the ANOVA as welch's since there is unequal variances among groups 
+# both plots look worse than the untransformed data, so I will run the ANOVA as welch's since there is unequal variances among groups 
 ```
 
+### One-Way Welch's ANOVA (Unequal Variances)
+
 ```{r}
-# anova
+# Running Welch's ANOVA
 
 oneway.test(GSW ~ Treatment, data = LICOR_anova, var.equal = FALSE)
 
 # F = 1.8511, num df = 4.000, denom df = 15.254, p-value = 0.1708
-# there is no need for post hoc testing as the result is insignificant
+# There is no need for post hoc testing as the result is statistically insignificant
 ```
 
+### Figure
+
 ```{r}
-# figure
+
 ggplot(LICOR_anova)+
   aes(x = Treatment, y = GSW, color = Treatment)+
   geom_boxplot(alpha = 0.5)+
@@ -202,18 +220,111 @@ ggplot(LICOR_anova)+
 
 ## Regression
 
-```{r}
-# assumption/normality tests
-```
+Is greater stomatal conductance associated with an increase in soil moisture for oak seedlings?
+
+### Checking for Normality and Assumptions
 
 ```{r}
-# regression
+# I know how the LICOR data behaves, but I must now look at the soil moisture data
+
+# First, I need to remove the intial outliers
+LICOR_Moist_Graphing <- LICOR_Moist_DATA[-c(94, 95), ]
+
+# How is the soil moisture data distributed?
+ggplot(LICOR_Moist_Graphing)+
+  aes(VWC_mean)+
+  geom_histogram(bins = 20)
+# The data appears abonormal, possibly with bimodal distribution. Sampling date may play a role in this distribution. I will separate the data by date. 
+ggplot(LICOR_Moist_Graphing)+
+  aes(VWC_mean)+
+  geom_histogram(bins = 25)+
+  facet_wrap(~Date)
+# The data shows a sharper left-skewed distribution on the first (dry) date, and a more gradual right-skewed distribution on the second (post-rain) date 
+
+# I will try log-transforming the data 
+ggplot(LICOR_Moist_Graphing)+
+  aes(log(VWC_mean))+
+  geom_histogram()
+# This is still skewed, but now only to one side instead of bimodal
+
+# I will see if there is a linear relationship between the two intended variables
+ggplot(LICOR_Moist_Graphing) +
+  aes(x = VWC_mean, y = GSW)+
+  geom_point()+
+  geom_smooth(method = "lm", se = FALSE)
+
+ggplot(LICOR_Moist_Graphing) +
+  aes(x = log(VWC_mean), y = GSW)+
+  geom_point()+
+  geom_smooth(method = "lm", se = FALSE)
+
+# Create the model
+LICOR_Moist_model <- lm(GSW ~ VWC_mean, data = LICOR_Moist_Graphing)
+
+plot(LICOR_Moist_model, which = 2)
+plot(LICOR_Moist_model, 1)
+
+# Log-transform VWC data 
+LICOR_Moist_Reg <- LICOR_Moist_Graphing %>% mutate(log_VWC = log(VWC_mean))
+LICOR_Moist_Reg[is.na(LICOR_Moist_Reg) | LICOR_Moist_Reg == "Inf" | LICOR_Moist_Reg == "-Inf"] <- NA
+
+LICOR_Moist_model2 <- lm(GSW ~ log_VWC, data = LICOR_Moist_Reg)
+plot(LICOR_Moist_model2, which = 2)
+plot(LICOR_Moist_model2, 1)
+# the HOV looks better in the original model, so I will not transform the data
+
 ```
 
-```{r}
-# post hoc
-```
+### Spearman's Rank Test 
 
 ```{r}
-# figure
+
+# Is there a correlation between the variables?
+LICOR_Moist_Spear <- cor.test(LICOR_Moist_Graphing$GSW, LICOR_Moist_Graphing$VWC_mean, method = "spearman", exact = FALSE)
+
+LICOR_Moist_Spear$estimate
+rho_spear <- round(LICOR_Moist_Spear$estimate, 3)
+
+LICOR_Moist_Spear$p.value
+round(LICOR_Moist_Spear$p.value, 3)
+# rho = -0.257, p-value = 0.001
+# there is a significant negative correlation between GSW and VWC 
+
+```
+
+### Simple Linear Regression
+
+```{r}
+
+summary(LICOR_Moist_model)
+
+slope <- coef(LICOR_Moist_model)[2]
+int <- coef(LICOR_Moist_model)[1]
+p <- summary(LICOR_Moist_model)$coefficients[2, 4]
+Rsq <- summary(LICOR_Moist_model)$r.squared
+
+Rsq <- round(Rsq, 4)
+slope <- round(slope, 4)
+int <- round(int, 4)
+p <- round(p, 6)
+
+```
+
+### Figure
+
+```{r}
+
+Reg_plot <- ggplot(LICOR_Moist_Graphing) +
+  aes(x = VWC_mean, y = GSW)+
+  geom_point()
+  
+
+Reg_plot +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_text(x = 10, y = 0.15,
+            label = paste("R-squared = ", Rsq, "\n", 
+                          "y = ", slope, "x +", int,"\n", "p =", p)) +
+  ylab("Stomatal Conductance (mmol m −2 s −1)")+
+  xlab("Soil Moisture (%VWC)")+
+  ggtitle("Oak Seedling Stomatal Conductance vs Soil Moisture")
 ```
