@@ -321,6 +321,7 @@ round(LICOR_Moist_Spear$p.value, 3)
 
 summary(LICOR_Moist_model)
 
+# making the vlaues into objects so that I can write the formula for the best fit line on the final figure
 slope <- coef(LICOR_Moist_model)[2]
 int <- coef(LICOR_Moist_model)[1]
 p <- summary(LICOR_Moist_model)$coefficients[2, 4]
