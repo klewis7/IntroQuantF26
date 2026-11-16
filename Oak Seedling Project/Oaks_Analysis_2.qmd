@@ -71,9 +71,6 @@ LICOR_Data_Raw <- full_join(LICOR_Data_Raw, ALL_Licor)
 
 ## Data Cleaning
 
-```{}
-```
-
 ```{r}
 # Clean height data for ANOVA
 Height_Data <- Height_Data_Raw |> 
@@ -86,10 +83,23 @@ Height_Data <- Height_Data_Raw |>
 # Remove 'dead' saplings   
   filter(Status != "Dead")
 
+# Change treatment class names which do not match 
+Height_Data$Treatment[Height_Data$Treatment == "OA"] <- "OS"
+
+
 # Checking classes of variables, changing to what they need to be for analysis
 glimpse(Height_Data)
 
 Height_Data$Treatment <- as.factor(Height_Data$Treatment)
+```
+
+```{r}
+ # Clean SPAD data and combine with Height data for regression
+
+SPAD_Data <- SPAD_Data_Raw |> 
+  select(Block, Tag_Num, Treatment, Leaf1, Leaf2, Leaf3, Leaf4, Leaf5, Leaf6) |> 
+  # remove NA rows
+  na.omit()
 ```
 
 ```{r}
@@ -133,25 +143,23 @@ Does treatment influence stomatal conductance of Oak seedlings?
 # assumption/normality tests
 
 # visualizing stomatal conductance across treatments 
-ggplot(LICOR_Data)+
-  aes(x = Treatment, y = GSW,)+
+ggplot(Height_Data)+
+  aes(x = Treatment, y = Height)+
   geom_boxplot()
 
-# removing two obvious outliers
-LICOR_Graphing <- LICOR_Data[-c(72, 73), ]
-
-ggplot(LICOR_Graphing)+
-  aes(x = Treatment, y = GSW,)+
-  geom_boxplot()
-
-# exmaining distribution
-ggplot(LICOR_Graphing)+
-  aes(x = GSW)+
+# exmaining height distribution
+ggplot(Height_Data)+
+  aes(x = Height)+
   geom_histogram()
-# data appears normal
+# data is skewed towards the left, I will try log transforming 
+
+ggplot(Height_Data)+
+  aes(x = log(Height))+
+  geom_histogram()
+# looks better
 
 # write the model 
-anova_model <- lm(GSW ~ Treatment, data = LICOR_Graphing)
+anova_model <- lm(log(Height) ~ Treatment, data = Height_Data)
 
 # checking q-q residuals
 plot(anova_model, which = 2)
@@ -159,40 +167,18 @@ plot(anova_model, which = 2)
 
 # shapiro test
 shapiro.test(anova_model$residuals)
-# W = 0.86233, p-value = 5.643e-13
+# W = 0.94188, p-value = 0.002356
 # this indicates abnormality (p < 0.05) in the data, but this test is highly sensitive with large sample sizes so I will continue
 
 # testing for homogeneity of variance 
 plot(anova_model, 1)
-# the residuals are highly variable, so I might try removing more outliers and/or transforming the data
-
-# Some outliers keep getting pointed out
-LICOR_anova <- LICOR_Graphing[-c(2, 66, 67), ]
-
-anova_model2 <- lm(GSW ~ Treatment, data = LICOR_anova)
-
-plot(anova_model2, which = 2)
-# this plot looks better, the residuals follow a more linear path
-plot(anova_model2, 1)
-# this plot looks slightly better, but there is still heterogeneity of variances, I will do a bartlett test
 
 # bartlett test
-bartlett.test(GSW ~ Treatment, data = LICOR_anova)
-# Bartlett's K-squared = 40.714, df = 4, p-value = 3.08e-08
-# p-value is extremely low, indicating variance between treatments, I will now try to transform the data 
+bartlett.test(log(Height) ~ Treatment, data = Height_Data)
+# Bartlett's K-squared = 16.233, df = 3, p-value = 0.001016
+# p-value is low, indicating variance between treatments
 
-LICOR_anova |> 
-  group_by(Treatment) |> 
-  summarize(Count = n())
-
-# transform data to see if that helps normality and HOV
-anova_model3 <- lm(log(GSW) ~ Treatment, data = LICOR_anova)
-
-plot(anova_model3, which = 2)
-plot(anova_model3, 1)
-# both plots look worse than the untransformed data 
-
-LICOR_anova |> 
+Height_Data |> 
   group_by(Treatment) |> 
   summarize(Count = n())
 # sample sizes are relatively even among groups, so I can ignore the assumption of homogeneity of variance 
@@ -204,39 +190,46 @@ LICOR_anova |>
 ```{r}
 # Running ANOVA
 
-anova(anova_model2)
-# p = 0.009787 
+anova(anova_model)
+# p = 4.094e-08
 
 # TukeyHSD post hoc
-TukeyHSD( aov(GSW ~ Treatment, data = LICOR_anova) )
+tukey_res <- TukeyHSD( aov(log(Height) ~ Treatment, data = Height_Data) )
+# NR-AC = 3.869177e-08
+# OS-AC = 0.0253268
+# NR-DT = 0.0000043
+# OS-NR = 0.0068289
 
-# OS-DT = 0.0082704
-# OS-NR = 0.0146241
+# need to see the full data to get the p-value for NR-AC
+tukey_df <- as.data.frame(tukey_res$Treatment)
+View(tukey_df)
+
 ```
 
 ### Figure
 
 ```{r}
 
-anova_summary <- LICOR_anova |> 
+anova_summary <- Height_Data |> 
   group_by(Treatment) |>
-  filter(Treatment != "??")|> 
-  summarise(mean = mean(GSW), 
-            se = sd(GSW)/sqrt(n()))
+  summarise(mean = mean(Height), 
+            se = sd(Height)/sqrt(n()))
 
 ggplot(anova_summary) + 
   aes(x = Treatment, y = mean, fill = Treatment) + 
   geom_col() + 
   geom_errorbar(aes(ymin = (mean - se), ymax = (mean + se)), width = 0.2)+
-  annotate("text", x = 1.5, y = -0.02, label = "p = 0.009787", fontface = "bold", size = 4.5)+
-  ylab("Mean Stomatal Conductance (mmol m −2 s −1)")+
+  annotate("text", x = 1, y = 38, label = "p = 4.094e-08", fontface = "bold", size = 3.5)+
+  ylab("Mean Height (cm)")+
+  theme_classic()+
   theme(legend.position = "none")+
-  ggtitle("Stomatal conductance of oak seedlings across treatments")+
-  geom_text(label = c("ABC", "AB", "AB", "C"), 
-            aes(y = 0.020, x = Treatment),
-            vjust = -0.5, 
+  ggtitle("Height of oak seedlings across treatments")+
+  geom_text(label = c("A", "AB", "", "B"), 
+            aes(y = 30, x = Treatment),
+            vjust = 0, 
             size = 4.5)+ 
-      ylim(-.035, 0.025)
+      ylim(0, 40)
+
 ```
 
 ## Regression
@@ -248,34 +241,32 @@ Is greater stomatal conductance associated with an increase in soil moisture for
 ```{r}
 # I know how the LICOR data behaves, but I must now look at the soil moisture data
 
-# First, I need to remove the intial outliers
-LICOR_Moist_Graphing <- LICOR_Moist_DATA[-c(94, 95), ]
 
 # How is the soil moisture data distributed?
-ggplot(LICOR_Moist_Graphing)+
+ggplot(Height_Moist_Data)+
   aes(VWC_mean)+
   geom_histogram(bins = 20)
 # The data appears abonormal, possibly with bimodal distribution. Sampling date may play a role in this distribution. I will separate the data by date. 
-ggplot(LICOR_Moist_Graphing)+
+ggplot(Height_Moist_Data)+
   aes(VWC_mean)+
   geom_histogram(bins = 25)+
   facet_wrap(~Date)
 # The data shows a sharper left-skewed distribution on the first (dry) date, and a more gradual right-skewed distribution on the second (post-rain) date 
 
 # I will try log-transforming the data 
-ggplot(LICOR_Moist_Graphing)+
+ggplot(Height_Moist_Data)+
   aes(log(VWC_mean))+
   geom_histogram()
 # This is still skewed, but now only to one side instead of bimodal
 
 # I will see if there is a linear relationship between the two intended variables
-ggplot(LICOR_Moist_Graphing) +
-  aes(x = VWC_mean, y = GSW)+
+ggplot(Height_Moist_Data) +
+  aes(x = VWC_mean, y = Height)+
   geom_point()+
   geom_smooth(method = "lm", se = FALSE)
 
-ggplot(LICOR_Moist_Graphing) +
-  aes(x = log(VWC_mean), y = GSW)+
+ggplot(Height_Moist_Data) +
+  aes(x = log(VWC_mean), y = log(Height))+
   geom_point()+
   geom_smooth(method = "lm", se = FALSE)
 
