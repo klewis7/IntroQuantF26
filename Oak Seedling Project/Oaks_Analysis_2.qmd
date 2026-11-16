@@ -1,0 +1,352 @@
+---
+title: "Oaks_Analysis_2"
+format: html
+---
+
+---
+title: "Oaks_Rough_Analysis"
+format: html
+editor: visual
+---
+
+# Oaks Analysis
+
+```{r}
+# load packages
+library(tidyverse)
+library(readxl)
+```
+
+```{r}
+# read in data
+Height_Data_Raw <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx", 
+             sheet = "Seedling Heights")
+
+Moist_Data_Raw <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx", 
+             sheet = "Soil Moisture")
+
+SPAD_Data_Raw <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx", 
+             sheet = "SPAD", 
+             na = "NA")
+LICOR_Data_Raw_NAMES <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx",              
+             sheet = "LICOR", 
+             n_max = 3, 
+             col_names = FALSE, 
+             col_types = "text") |> 
+  summarise(across(.fns = paste, collapse = "_")) |> 
+  unlist() |> 
+  unname()
+
+LICOR_Data_Raw <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx",  
+             sheet = "LICOR", 
+             skip = 3, 
+             col_names = LICOR_Data_Raw_NAMES,
+             col_types = "text")
+
+
+ALL_Licor_NAMES <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx", 
+             sheet = "ALL_Licor_Ignore", 
+             n_max = 3, 
+             col_names = FALSE, 
+             col_types = "text") |> 
+  summarise(across(.fns = paste, collapse = "_")) |> 
+  unlist() |> 
+  unname()
+
+ALL_Licor <- 
+  read_excel("Oak Data Entry MCRS Field Trip.xlsx", 
+             sheet = "ALL_Licor_Ignore", 
+             skip = 3, 
+             col_names = ALL_Licor_NAMES, 
+             col_types = "text")
+
+LICOR_Data_Raw <- full_join(LICOR_Data_Raw, ALL_Licor)
+```
+
+## Data Cleaning
+
+```{}
+```
+
+```{r}
+# Clean height data for ANOVA
+Height_Data <- Height_Data_Raw |> 
+  select(Date, Block, Tag_Num, Treatment, Sapling_AB_etc, Seedling_Ht_cm, Dead_Alive) |> 
+# Rename columns
+  rename(Tag = Tag_Num, 
+         SaplingID = Sapling_AB_etc,
+         Height = Seedling_Ht_cm, 
+         Status = Dead_Alive) |> 
+# Remove 'dead' saplings   
+  filter(Status != "Dead")
+
+# Checking classes of variables, changing to what they need to be for analysis
+glimpse(Height_Data)
+
+Height_Data$Treatment <- as.factor(Height_Data$Treatment)
+```
+
+```{r}
+# Clean moisture data and combine with LICOR data for regression
+
+# Select what columns I want
+Moist_Data <- Moist_Data_Raw |> 
+  select(Block, Treatment, VWC1_perc, VWC2_perc, VWC3_perc) |> 
+  # remove NA rows
+  na.omit() |> 
+  
+  # rename columns
+  rename(VWC_1 = VWC1_perc, 
+         VWC_2 = VWC2_perc, 
+         VWC_3 = VWC3_perc)
+
+# change classes of columns 
+Moist_Data$VWC_1 <- as.numeric(Moist_Data$VWC_1)
+Moist_Data$VWC_2 <- as.numeric(Moist_Data$VWC_2)
+Moist_Data$VWC_3 <- as.numeric(Moist_Data$VWC_3)
+
+Moist_Data$Block <- as.factor(Moist_Data$Block)
+Moist_Data$Treatment <- as.factor(Moist_Data$Treatment)
+
+# create a mean colum for VWC
+Moist_Data <- Moist_Data |> 
+  mutate(VWC_mean = rowMeans(pick(VWC_1, VWC_2, VWC_3), na.rm = TRUE)) 
+
+# join height and moisture data
+Height_Moist_Data <- full_join(Moist_Data, Height_Data, by = c("Treatment", "Block"), relationship = "many-to-many")
+
+```
+
+## ANOVA
+
+Does treatment influence stomatal conductance of Oak seedlings?
+
+### Checking for Normality and Assumptions
+
+```{r}
+# assumption/normality tests
+
+# visualizing stomatal conductance across treatments 
+ggplot(LICOR_Data)+
+  aes(x = Treatment, y = GSW,)+
+  geom_boxplot()
+
+# removing two obvious outliers
+LICOR_Graphing <- LICOR_Data[-c(72, 73), ]
+
+ggplot(LICOR_Graphing)+
+  aes(x = Treatment, y = GSW,)+
+  geom_boxplot()
+
+# exmaining distribution
+ggplot(LICOR_Graphing)+
+  aes(x = GSW)+
+  geom_histogram()
+# data appears normal
+
+# write the model 
+anova_model <- lm(GSW ~ Treatment, data = LICOR_Graphing)
+
+# checking q-q residuals
+plot(anova_model, which = 2)
+# the majority of the residuals follow the trendline, so I will continue
+
+# shapiro test
+shapiro.test(anova_model$residuals)
+# W = 0.86233, p-value = 5.643e-13
+# this indicates abnormality (p < 0.05) in the data, but this test is highly sensitive with large sample sizes so I will continue
+
+# testing for homogeneity of variance 
+plot(anova_model, 1)
+# the residuals are highly variable, so I might try removing more outliers and/or transforming the data
+
+# Some outliers keep getting pointed out
+LICOR_anova <- LICOR_Graphing[-c(2, 66, 67), ]
+
+anova_model2 <- lm(GSW ~ Treatment, data = LICOR_anova)
+
+plot(anova_model2, which = 2)
+# this plot looks better, the residuals follow a more linear path
+plot(anova_model2, 1)
+# this plot looks slightly better, but there is still heterogeneity of variances, I will do a bartlett test
+
+# bartlett test
+bartlett.test(GSW ~ Treatment, data = LICOR_anova)
+# Bartlett's K-squared = 40.714, df = 4, p-value = 3.08e-08
+# p-value is extremely low, indicating variance between treatments, I will now try to transform the data 
+
+LICOR_anova |> 
+  group_by(Treatment) |> 
+  summarize(Count = n())
+
+# transform data to see if that helps normality and HOV
+anova_model3 <- lm(log(GSW) ~ Treatment, data = LICOR_anova)
+
+plot(anova_model3, which = 2)
+plot(anova_model3, 1)
+# both plots look worse than the untransformed data 
+
+LICOR_anova |> 
+  group_by(Treatment) |> 
+  summarize(Count = n())
+# sample sizes are relatively even among groups, so I can ignore the assumption of homogeneity of variance 
+
+```
+
+### One-Way ANOVA and Post-Hoc Test
+
+```{r}
+# Running ANOVA
+
+anova(anova_model2)
+# p = 0.009787 
+
+# TukeyHSD post hoc
+TukeyHSD( aov(GSW ~ Treatment, data = LICOR_anova) )
+
+# OS-DT = 0.0082704
+# OS-NR = 0.0146241
+```
+
+### Figure
+
+```{r}
+
+anova_summary <- LICOR_anova |> 
+  group_by(Treatment) |>
+  filter(Treatment != "??")|> 
+  summarise(mean = mean(GSW), 
+            se = sd(GSW)/sqrt(n()))
+
+ggplot(anova_summary) + 
+  aes(x = Treatment, y = mean, fill = Treatment) + 
+  geom_col() + 
+  geom_errorbar(aes(ymin = (mean - se), ymax = (mean + se)), width = 0.2)+
+  annotate("text", x = 1.5, y = -0.02, label = "p = 0.009787", fontface = "bold", size = 4.5)+
+  ylab("Mean Stomatal Conductance (mmol m −2 s −1)")+
+  theme(legend.position = "none")+
+  ggtitle("Stomatal conductance of oak seedlings across treatments")+
+  geom_text(label = c("ABC", "AB", "AB", "C"), 
+            aes(y = 0.020, x = Treatment),
+            vjust = -0.5, 
+            size = 4.5)+ 
+      ylim(-.035, 0.025)
+```
+
+## Regression
+
+Is greater stomatal conductance associated with an increase in soil moisture for oak seedlings?
+
+### Checking for Normality and Assumptions
+
+```{r}
+# I know how the LICOR data behaves, but I must now look at the soil moisture data
+
+# First, I need to remove the intial outliers
+LICOR_Moist_Graphing <- LICOR_Moist_DATA[-c(94, 95), ]
+
+# How is the soil moisture data distributed?
+ggplot(LICOR_Moist_Graphing)+
+  aes(VWC_mean)+
+  geom_histogram(bins = 20)
+# The data appears abonormal, possibly with bimodal distribution. Sampling date may play a role in this distribution. I will separate the data by date. 
+ggplot(LICOR_Moist_Graphing)+
+  aes(VWC_mean)+
+  geom_histogram(bins = 25)+
+  facet_wrap(~Date)
+# The data shows a sharper left-skewed distribution on the first (dry) date, and a more gradual right-skewed distribution on the second (post-rain) date 
+
+# I will try log-transforming the data 
+ggplot(LICOR_Moist_Graphing)+
+  aes(log(VWC_mean))+
+  geom_histogram()
+# This is still skewed, but now only to one side instead of bimodal
+
+# I will see if there is a linear relationship between the two intended variables
+ggplot(LICOR_Moist_Graphing) +
+  aes(x = VWC_mean, y = GSW)+
+  geom_point()+
+  geom_smooth(method = "lm", se = FALSE)
+
+ggplot(LICOR_Moist_Graphing) +
+  aes(x = log(VWC_mean), y = GSW)+
+  geom_point()+
+  geom_smooth(method = "lm", se = FALSE)
+
+# Create the model
+LICOR_Moist_model <- lm(GSW ~ VWC_mean, data = LICOR_Moist_Graphing)
+
+plot(LICOR_Moist_model, which = 2)
+plot(LICOR_Moist_model, 1)
+
+# Log-transform VWC data 
+LICOR_Moist_Reg <- LICOR_Moist_Graphing %>% mutate(log_VWC = log(VWC_mean))
+LICOR_Moist_Reg[is.na(LICOR_Moist_Reg) | LICOR_Moist_Reg == "Inf" | LICOR_Moist_Reg == "-Inf"] <- NA
+
+LICOR_Moist_model2 <- lm(GSW ~ log_VWC, data = LICOR_Moist_Reg)
+plot(LICOR_Moist_model2, which = 2)
+plot(LICOR_Moist_model2, 1)
+# the HOV looks better in the original model, so I will not transform the data
+
+```
+
+### Spearman's Rank Test
+
+```{r}
+
+# Is there a correlation between the variables?
+LICOR_Moist_Spear <- cor.test(LICOR_Moist_Graphing$GSW, LICOR_Moist_Graphing$VWC_mean, method = "spearman", exact = FALSE)
+
+LICOR_Moist_Spear$estimate
+rho_spear <- round(LICOR_Moist_Spear$estimate, 3)
+
+LICOR_Moist_Spear$p.value
+round(LICOR_Moist_Spear$p.value, 3)
+# rho = -0.257, p-value = 0.001
+# there is a significant negative correlation between GSW and VWC 
+
+```
+
+### Simple Linear Regression
+
+```{r}
+
+summary(LICOR_Moist_model)
+
+# making the vlaues into objects so that I can write the formula for the best fit line on the final figure
+slope <- coef(LICOR_Moist_model)[2]
+int <- coef(LICOR_Moist_model)[1]
+p <- summary(LICOR_Moist_model)$coefficients[2, 4]
+Rsq <- summary(LICOR_Moist_model)$r.squared
+
+Rsq <- round(Rsq, 4)
+slope <- round(slope, 4)
+int <- round(int, 4)
+p <- round(p, 6)
+
+```
+
+### Figure
+
+```{r}
+
+Reg_plot <- ggplot(LICOR_Moist_Graphing) +
+  aes(x = VWC_mean, y = GSW)+
+  geom_point()
+  
+
+Reg_plot +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_text(x = 10, y = 0.15,
+            label = paste("R-squared = ", Rsq, "\n", 
+                          "y = ", slope, "x +", int,"\n", "p =", p)) +
+  ylab("Stomatal Conductance (mmol m −2 s −1)")+
+  xlab("Soil Moisture (%VWC)")+
+  ggtitle("Oak Seedling Stomatal Conductance vs Soil Moisture")
+```
