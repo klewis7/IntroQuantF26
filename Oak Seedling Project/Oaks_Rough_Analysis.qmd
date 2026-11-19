@@ -10,6 +10,7 @@ editor: visual
 # load packages
 library(tidyverse)
 library(readxl)
+library(dplyr)
 ```
 
 ```{r}
@@ -100,7 +101,7 @@ LICOR_Data$Date <- as.character(LICOR_Data$Date)
 
 # Select what columns I want
 Moist_Data <- Moist_Data_Raw |> 
-  select(Block, Treatment, VWC1_perc, VWC2_perc, VWC3_perc) |> 
+  select(Block, Date, Treatment, VWC1_perc, VWC2_perc, VWC3_perc) |> 
   # remove NA rows
   na.omit() |> 
   
@@ -123,6 +124,36 @@ Moist_Data <- Moist_Data |>
 
 # join LICOR and moisture data 
 LICOR_Moist_DATA<- full_join(Moist_Data, LICOR_Data, by = c("Treatment", "Block"), relationship = "many-to-many")
+
+Moist_8 <- Moist_Data |> 
+filter(as.Date(Date) != "2026-10-21")
+
+ggplot(Moist_8) +
+  aes(x = log(VWC_mean))+
+  geom_histogram(bins = 30)
+
+Moist_8 <- Moist_8 |> 
+  mutate(logVWC = log(VWC_mean))
+
+moist_anova_model <- lm(log1p(VWC_mean) ~ Treatment, data = Moist_8)
+
+anova(moist_anova_model)
+
+model <- lm(log1p(y) ~ x, data = df)
+
+Moist_2 <- Moist_Data |> 
+  filter(as.Date(Date) != "2026-10-08")
+
+ggplot(Moist_2)+
+  aes(x = log(VWC_mean))+
+  geom_histogram()
+
+Height_8 <- Height
+
+Moist_8[sapply(Moist_8, is.nan)] <- NA
+
+Height_Moist_DATA<- full_join(Moist_8, LICOR_Data, by = c("Treatment", "Block"), relationship = "many-to-many") 
+
 ```
 
 ## ANOVA

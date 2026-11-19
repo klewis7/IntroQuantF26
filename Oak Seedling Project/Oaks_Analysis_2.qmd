@@ -91,6 +91,17 @@ Height_Data$Treatment[Height_Data$Treatment == "OA"] <- "OS"
 glimpse(Height_Data)
 
 Height_Data$Treatment <- as.factor(Height_Data$Treatment)
+
+Height_Data$SaplingID <- as.character(Height_Data$SaplingID)
+
+Height_Data$SaplingID[Height_Data$SaplingID == ""] <- NA
+
+
+# make sapling id uniform
+Height_Data <- Height_Data |> 
+mutate(SaplingID = if_else(SaplingID == "A", "A1", SaplingID)) |> 
+  mutate(SaplingID = if_else(SaplingID == "B", "A2", SaplingID)) |> 
+  mutate(SaplingID = if_else(SaplingID == "C", "A3", SaplingID))
 ```
 
 ```{r}
@@ -100,49 +111,36 @@ SPAD_Data <- SPAD_Data_Raw |>
   select(Block, Tag_Num, Treatment, Leaf1, Leaf2, Leaf3, Leaf4, Leaf5, Leaf6) |> 
   # remove NA rows
   na.omit()
+
+  # create mean SPAD column
+  SPAD_Data <- SPAD_Data |> 
+mutate((SPAD_mean = rowMeans(pick(Leaf1, Leaf2, Leaf3, Leaf4, Leaf5, Leaf6), na.rm = TRUE)))
+  
+  # separate sapling number from tag number
+SPAD_Data <- SPAD_Data |> 
+  separate(col = "Tag_Num", sep = 3, into = c("Tag", "SaplingID"))
+
+ # make sapling id uniform
+SPAD_Data[SPAD_Data == "B"] <- "A2"
+SPAD_Data[SPAD_Data == "A"] <- "A1"
 ```
 
 ```{r}
-# Clean moisture data and combine with LICOR data for regression
+# Combine SPAD data with height data for regression
 
-# Select what columns I want
-Moist_Data <- Moist_Data_Raw |> 
-  select(Block, Treatment, VWC1_perc, VWC2_perc, VWC3_perc) |> 
-  # remove NA rows
-  na.omit() |> 
-  
-  # rename columns
-  rename(VWC_1 = VWC1_perc, 
-         VWC_2 = VWC2_perc, 
-         VWC_3 = VWC3_perc)
-
-# change classes of columns 
-Moist_Data$VWC_1 <- as.numeric(Moist_Data$VWC_1)
-Moist_Data$VWC_2 <- as.numeric(Moist_Data$VWC_2)
-Moist_Data$VWC_3 <- as.numeric(Moist_Data$VWC_3)
-
-Moist_Data$Block <- as.factor(Moist_Data$Block)
-Moist_Data$Treatment <- as.factor(Moist_Data$Treatment)
-
-# create a mean colum for VWC
-Moist_Data <- Moist_Data |> 
-  mutate(VWC_mean = rowMeans(pick(VWC_1, VWC_2, VWC_3), na.rm = TRUE)) 
-
-# join height and moisture data
-Height_Moist_Data <- full_join(Moist_Data, Height_Data, by = c("Treatment", "Block"), relationship = "many-to-many")
-
+Height_SPAD <- inner_join(SPAD_Data, Height_Data, by = c("Block", "Treatment", "Tag"))
 ```
 
 ## ANOVA
 
-Does treatment influence stomatal conductance of Oak seedlings?
+Does treatment influence height of Oak seedlings?
 
 ### Checking for Normality and Assumptions
 
 ```{r}
 # assumption/normality tests
 
-# visualizing stomatal conductance across treatments 
+# visualizing height conductance across treatments 
 ggplot(Height_Data)+
   aes(x = Treatment, y = Height)+
   geom_boxplot()
@@ -232,6 +230,55 @@ ggplot(anova_summary) +
 
 ```
 
+## ANOVA II
+
+### Checking for Normality and Assumptions
+
+```{r}
+# assumption/normality tests
+
+# visualizing height conductance across treatments 
+ggplot(SPAD_Data)+
+  aes(x = Treatment, y = SPAD_)+
+  geom_boxplot()
+
+# exmaining height distribution
+ggplot(Height_Data)+
+  aes(x = Height)+
+  geom_histogram()
+# data is skewed towards the left, I will try log transforming 
+
+ggplot(Height_Data)+
+  aes(x = log(Height))+
+  geom_histogram()
+# looks better
+
+# write the model 
+anova_model <- lm(log(Height) ~ Treatment, data = Height_Data)
+
+# checking q-q residuals
+plot(anova_model, which = 2)
+# the majority of the residuals follow the trendline, so I will continue
+
+# shapiro test
+shapiro.test(anova_model$residuals)
+# W = 0.94188, p-value = 0.002356
+# this indicates abnormality (p < 0.05) in the data, but this test is highly sensitive with large sample sizes so I will continue
+
+# testing for homogeneity of variance 
+plot(anova_model, 1)
+
+# bartlett test
+bartlett.test(log(Height) ~ Treatment, data = Height_Data)
+# Bartlett's K-squared = 16.233, df = 3, p-value = 0.001016
+# p-value is low, indicating variance between treatments
+
+Height_Data |> 
+  group_by(Treatment) |> 
+  summarize(Count = n())
+# sample sizes are relatively even among groups, so I can ignore the assumption of homogeneity of variance 
+```
+
 ## Regression
 
 Is greater stomatal conductance associated with an increase in soil moisture for oak seedlings?
@@ -261,7 +308,7 @@ ggplot(Height_Moist_Data)+
 
 # I will see if there is a linear relationship between the two intended variables
 ggplot(Height_Moist_Data) +
-  aes(x = VWC_mean, y = Height)+
+  aes(x = VWC_mean, y = Height, color = factor(Date))+
   geom_point()+
   geom_smooth(method = "lm", se = FALSE)
 
@@ -270,20 +317,27 @@ ggplot(Height_Moist_Data) +
   geom_point()+
   geom_smooth(method = "lm", se = FALSE)
 
-# Create the model
-LICOR_Moist_model <- lm(GSW ~ VWC_mean, data = LICOR_Moist_Graphing)
+# making the model 
+height_moist_model <- lm(Height ~ VWC_mean, data = Height_Moist_Data)
+#visualizing residuals
+plot(height_moist_model, which = 2)
+plot(height_moist_model, 1)
 
-plot(LICOR_Moist_model, which = 2)
-plot(LICOR_Moist_model, 1)
+# cleaning data for log transform
+Height_Moist_Data <- Height_Moist_Data[-c(42), ]
 
-# Log-transform VWC data 
-LICOR_Moist_Reg <- LICOR_Moist_Graphing %>% mutate(log_VWC = log(VWC_mean))
-LICOR_Moist_Reg[is.na(LICOR_Moist_Reg) | LICOR_Moist_Reg == "Inf" | LICOR_Moist_Reg == "-Inf"] <- NA
+summary(Height_Moist_Data)
+logdf <- Height_Moist_Data |> 
+  mutate(log_VWC = log(VWC_mean))|> 
+  mutate(log_height = log(Height))
 
-LICOR_Moist_model2 <- lm(GSW ~ log_VWC, data = LICOR_Moist_Reg)
-plot(LICOR_Moist_model2, which = 2)
-plot(LICOR_Moist_model2, 1)
-# the HOV looks better in the original model, so I will not transform the data
+logdf[logdf == "Inf" | logdf == "-Inf"] <- NA
+
+logmodel <- lm(log_height ~ log_VWC, data = logdf)
+
+plot(logmodel, which = 2)
+plot(logmodel, 1)
+
 
 ```
 
@@ -292,23 +346,33 @@ plot(LICOR_Moist_model2, 1)
 ```{r}
 
 # Is there a correlation between the variables?
-LICOR_Moist_Spear <- cor.test(LICOR_Moist_Graphing$GSW, LICOR_Moist_Graphing$VWC_mean, method = "spearman", exact = FALSE)
 
-LICOR_Moist_Spear$estimate
-rho_spear <- round(LICOR_Moist_Spear$estimate, 3)
+height_moist_spear <- cor.test(logdf$log_height, logdf$log_VWC, method = "spearman", exact = FALSE)
 
-LICOR_Moist_Spear$p.value
-round(LICOR_Moist_Spear$p.value, 3)
-# rho = -0.257, p-value = 0.001
-# there is a significant negative correlation between GSW and VWC 
+height_moist_spear$estimate
+rho_spear <- round(height_moist_spear$estimate, 3)
 
+height_moist_spear$p.value
+round(height_moist_spear$p.value, 3)
+# rho = -0.217, p-value = 0.075
+
+
+
+height_moist_spear_nolog <- cor.test(Height_Moist_Data$Height, Height_Moist_Data$VWC_mean, method = "spearman", exact = FALSE)
+
+height_moist_spear_nolog$estimate
+rho_spear_nolog <- round(height_moist_spear_nolog$estimate, 3)
+
+height_moist_spear$p.value
+round(height_moist_spear$p.value, 3)
 ```
 
 ### Simple Linear Regression
 
 ```{r}
 
-summary(LICOR_Moist_model)
+summary(height_moist_model)
+summary(logmodel)
 
 # making the vlaues into objects so that I can write the formula for the best fit line on the final figure
 slope <- coef(LICOR_Moist_model)[2]
