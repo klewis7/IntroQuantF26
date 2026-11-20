@@ -83,9 +83,11 @@ Height_Data <- Height_Data_Raw |>
 # Remove 'dead' saplings   
   filter(Status != "Dead")
 
+Height_Data <- Height_Data |> 
+  filter(Treatment != "NR")
+
 # Change treatment class names which do not match 
 Height_Data$Treatment[Height_Data$Treatment == "OA"] <- "OS"
-
 
 # Checking classes of variables, changing to what they need to be for analysis
 glimpse(Height_Data)
@@ -94,14 +96,14 @@ Height_Data$Treatment <- as.factor(Height_Data$Treatment)
 
 Height_Data$SaplingID <- as.character(Height_Data$SaplingID)
 
-Height_Data$SaplingID[Height_Data$SaplingID == ""] <- NA
-
+Height_Data$SaplingID[is.na(Height_Data$SaplingID)] <- ""
 
 # make sapling id uniform
 Height_Data <- Height_Data |> 
 mutate(SaplingID = if_else(SaplingID == "A", "A1", SaplingID)) |> 
   mutate(SaplingID = if_else(SaplingID == "B", "A2", SaplingID)) |> 
-  mutate(SaplingID = if_else(SaplingID == "C", "A3", SaplingID))
+  mutate(SaplingID = if_else(SaplingID == "C", "A3", SaplingID)) |> 
+  mutate(SaplingID = if_else(SaplingID == "", "A1", SaplingID))
 ```
 
 ```{r}
@@ -110,11 +112,15 @@ mutate(SaplingID = if_else(SaplingID == "A", "A1", SaplingID)) |>
 SPAD_Data <- SPAD_Data_Raw |> 
   select(Block, Tag_Num, Treatment, Leaf1, Leaf2, Leaf3, Leaf4, Leaf5, Leaf6) |> 
   # remove NA rows
-  na.omit()
+  na.omit() |> 
 
   # create mean SPAD column
-  SPAD_Data <- SPAD_Data |> 
 mutate((SPAD_mean = rowMeans(pick(Leaf1, Leaf2, Leaf3, Leaf4, Leaf5, Leaf6), na.rm = TRUE)))
+
+names(SPAD_Data)[10] <- "SPAD_mean"
+  
+SPAD_Data <- SPAD_Data |> 
+  filter(Treatment != "NR")
   
   # separate sapling number from tag number
 SPAD_Data <- SPAD_Data |> 
@@ -123,12 +129,13 @@ SPAD_Data <- SPAD_Data |>
  # make sapling id uniform
 SPAD_Data[SPAD_Data == "B"] <- "A2"
 SPAD_Data[SPAD_Data == "A"] <- "A1"
+SPAD_Data[SPAD_Data == ""] <- "A1"
 ```
 
 ```{r}
 # Combine SPAD data with height data for regression
 
-Height_SPAD <- inner_join(SPAD_Data, Height_Data, by = c("Block", "Treatment", "Tag"))
+Height_SPAD <- inner_join(SPAD_Data, Height_Data, by = c("Block", "Treatment", "Tag", "SaplingID"))
 ```
 
 ## ANOVA
@@ -165,7 +172,7 @@ plot(anova_model, which = 2)
 
 # shapiro test
 shapiro.test(anova_model$residuals)
-# W = 0.94188, p-value = 0.002356
+# W = 0.94451, p-value = 0.01216
 # this indicates abnormality (p < 0.05) in the data, but this test is highly sensitive with large sample sizes so I will continue
 
 # testing for homogeneity of variance 
@@ -173,7 +180,7 @@ plot(anova_model, 1)
 
 # bartlett test
 bartlett.test(log(Height) ~ Treatment, data = Height_Data)
-# Bartlett's K-squared = 16.233, df = 3, p-value = 0.001016
+# Bartlett's K-squared = 16.167, df = 2, p-value = 0.0003086
 # p-value is low, indicating variance between treatments
 
 Height_Data |> 
@@ -189,18 +196,12 @@ Height_Data |>
 # Running ANOVA
 
 anova(anova_model)
-# p = 4.094e-08
+# p = 0.01821
 
 # TukeyHSD post hoc
 tukey_res <- TukeyHSD( aov(log(Height) ~ Treatment, data = Height_Data) )
-# NR-AC = 3.869177e-08
-# OS-AC = 0.0253268
-# NR-DT = 0.0000043
-# OS-NR = 0.0068289
-
-# need to see the full data to get the p-value for NR-AC
-tukey_df <- as.data.frame(tukey_res$Treatment)
-View(tukey_df)
+print(tukey_res)
+# OS-AC = 0.01356367
 
 ```
 
@@ -217,16 +218,16 @@ ggplot(anova_summary) +
   aes(x = Treatment, y = mean, fill = Treatment) + 
   geom_col() + 
   geom_errorbar(aes(ymin = (mean - se), ymax = (mean + se)), width = 0.2)+
-  annotate("text", x = 1, y = 38, label = "p = 4.094e-08", fontface = "bold", size = 3.5)+
+  annotate("text", x = .75, y = 37, label = "p = 0.0136", fontface = "bold", size = 3.5)+
   ylab("Mean Height (cm)")+
   theme_classic()+
-  theme(legend.position = "none")+
+  theme(legend.position = "none") +
   ggtitle("Height of oak seedlings across treatments")+
-  geom_text(label = c("A", "AB", "", "B"), 
+  geom_text(label = c("A", "AB", "B"), 
             aes(y = 30, x = Treatment),
             vjust = 0, 
             size = 4.5)+ 
-      ylim(0, 40)
+      ylim(0, 38)
 
 ```
 
@@ -237,46 +238,61 @@ ggplot(anova_summary) +
 ```{r}
 # assumption/normality tests
 
-# visualizing height conductance across treatments 
+# visualizing SPAD across treatments 
 ggplot(SPAD_Data)+
-  aes(x = Treatment, y = SPAD_)+
+  aes(x = Treatment, y = SPAD_mean)+
   geom_boxplot()
 
-# exmaining height distribution
-ggplot(Height_Data)+
-  aes(x = Height)+
+# exmaining SPAD distribution
+ggplot(SPAD_Data)+
+  aes(x = SPAD_mean)+
   geom_histogram()
-# data is skewed towards the left, I will try log transforming 
-
-ggplot(Height_Data)+
-  aes(x = log(Height))+
-  geom_histogram()
-# looks better
 
 # write the model 
-anova_model <- lm(log(Height) ~ Treatment, data = Height_Data)
+anova_model2 <- lm((SPAD_mean) ~ Treatment, data = SPAD_Data)
 
 # checking q-q residuals
-plot(anova_model, which = 2)
+plot(anova_model2, which = 2)
 # the majority of the residuals follow the trendline, so I will continue
 
 # shapiro test
-shapiro.test(anova_model$residuals)
-# W = 0.94188, p-value = 0.002356
-# this indicates abnormality (p < 0.05) in the data, but this test is highly sensitive with large sample sizes so I will continue
+shapiro.test(anova_model2$residuals)
+# W = 0.9301, p-value = 0.1739
+# this indicates normality
 
 # testing for homogeneity of variance 
-plot(anova_model, 1)
+plot(anova_model2, 1)
 
 # bartlett test
-bartlett.test(log(Height) ~ Treatment, data = Height_Data)
-# Bartlett's K-squared = 16.233, df = 3, p-value = 0.001016
-# p-value is low, indicating variance between treatments
+bartlett.test(SPAD_mean ~ Treatment, data = SPAD_Data)
+# Bartlett's K-squared = 0.72012, df = 2, p-value = 0.6976
+```
 
-Height_Data |> 
-  group_by(Treatment) |> 
-  summarize(Count = n())
-# sample sizes are relatively even among groups, so I can ignore the assumption of homogeneity of variance 
+```{r}
+# Running ANOVA
+
+anova(anova_model2)
+# p = 0.5042
+
+```
+
+```{r}
+anova2_summary <- SPAD_Data |> 
+  group_by(Treatment) |>
+  summarise(mean = mean(SPAD_mean), 
+            se = sd(SPAD_mean)/sqrt(n()))
+
+ggplot(anova2_summary) +
+  aes(x = reorder(Treatment, mean), y = mean, fill = Treatment) + 
+  geom_col() + 
+  geom_errorbar(aes(ymin = (mean - se), ymax = (mean + se)), width = 0.2) +
+  annotate("text", x = 0.75, y = 38, label = "p = 0.5042", fontface = "bold", size = 3.5)+
+  ylab("Mean leaf greenness (SPAD)")+
+  xlab("Treatment")+
+  theme_classic()+
+  theme(legend.position = "none") +
+  ggtitle("Leaf Greenness of Oak Seedlings Across Treatments")
+
 ```
 
 ## Regression
@@ -286,58 +302,23 @@ Is greater stomatal conductance associated with an increase in soil moisture for
 ### Checking for Normality and Assumptions
 
 ```{r}
-# I know how the LICOR data behaves, but I must now look at the soil moisture data
-
-
-# How is the soil moisture data distributed?
-ggplot(Height_Moist_Data)+
-  aes(VWC_mean)+
-  geom_histogram(bins = 20)
-# The data appears abonormal, possibly with bimodal distribution. Sampling date may play a role in this distribution. I will separate the data by date. 
-ggplot(Height_Moist_Data)+
-  aes(VWC_mean)+
-  geom_histogram(bins = 25)+
-  facet_wrap(~Date)
-# The data shows a sharper left-skewed distribution on the first (dry) date, and a more gradual right-skewed distribution on the second (post-rain) date 
-
-# I will try log-transforming the data 
-ggplot(Height_Moist_Data)+
-  aes(log(VWC_mean))+
-  geom_histogram()
-# This is still skewed, but now only to one side instead of bimodal
 
 # I will see if there is a linear relationship between the two intended variables
-ggplot(Height_Moist_Data) +
-  aes(x = VWC_mean, y = Height, color = factor(Date))+
-  geom_point()+
-  geom_smooth(method = "lm", se = FALSE)
-
-ggplot(Height_Moist_Data) +
-  aes(x = log(VWC_mean), y = log(Height))+
+ggplot(Height_SPAD) +
+  aes(x = Height, y = SPAD_mean)+
   geom_point()+
   geom_smooth(method = "lm", se = FALSE)
 
 # making the model 
-height_moist_model <- lm(Height ~ VWC_mean, data = Height_Moist_Data)
+reg_model <- lm(SPAD_mean ~ Height, data = Height_SPAD)
+
 #visualizing residuals
-plot(height_moist_model, which = 2)
-plot(height_moist_model, 1)
 
-# cleaning data for log transform
-Height_Moist_Data <- Height_Moist_Data[-c(42), ]
+plot(reg_model, which = 2)
+plot(reg_model, 1)
 
-summary(Height_Moist_Data)
-logdf <- Height_Moist_Data |> 
-  mutate(log_VWC = log(VWC_mean))|> 
-  mutate(log_height = log(Height))
-
-logdf[logdf == "Inf" | logdf == "-Inf"] <- NA
-
-logmodel <- lm(log_height ~ log_VWC, data = logdf)
-
-plot(logmodel, which = 2)
-plot(logmodel, 1)
-
+shapiro.test(reg_model$residuals)
+# W = 0.94663, p-value = 0.4054
 
 ```
 
@@ -347,43 +328,32 @@ plot(logmodel, 1)
 
 # Is there a correlation between the variables?
 
-height_moist_spear <- cor.test(logdf$log_height, logdf$log_VWC, method = "spearman", exact = FALSE)
+spearcor <- cor.test(Height_SPAD$SPAD_mean, Height_SPAD$Height, method = "spearman", exact = FALSE)
 
-height_moist_spear$estimate
-rho_spear <- round(height_moist_spear$estimate, 3)
+spearcor$estimate
+rho_spear <- round(spearcor$estimate, 3)
 
-height_moist_spear$p.value
-round(height_moist_spear$p.value, 3)
-# rho = -0.217, p-value = 0.075
-
-
-
-height_moist_spear_nolog <- cor.test(Height_Moist_Data$Height, Height_Moist_Data$VWC_mean, method = "spearman", exact = FALSE)
-
-height_moist_spear_nolog$estimate
-rho_spear_nolog <- round(height_moist_spear_nolog$estimate, 3)
-
-height_moist_spear$p.value
-round(height_moist_spear$p.value, 3)
+spearcor$p.value
+round(spearcor$p.value, 3)
+# rho = -0.054, p-value = 0.837
 ```
 
 ### Simple Linear Regression
 
 ```{r}
 
-summary(height_moist_model)
-summary(logmodel)
+summary(reg_model)
 
 # making the vlaues into objects so that I can write the formula for the best fit line on the final figure
-slope <- coef(LICOR_Moist_model)[2]
-int <- coef(LICOR_Moist_model)[1]
-p <- summary(LICOR_Moist_model)$coefficients[2, 4]
-Rsq <- summary(LICOR_Moist_model)$r.squared
+slope <- coef(reg_model)[2]
+int <- coef(reg_model)[1]
+p <- summary(reg_model)$coefficients[2, 4]
+Rsq <- summary(reg_model)$r.squared
 
 Rsq <- round(Rsq, 4)
 slope <- round(slope, 4)
 int <- round(int, 4)
-p <- round(p, 6)
+p <- round(p, 4)
 
 ```
 
@@ -391,17 +361,18 @@ p <- round(p, 6)
 
 ```{r}
 
-Reg_plot <- ggplot(LICOR_Moist_Graphing) +
-  aes(x = VWC_mean, y = GSW)+
+Reg_plot <- ggplot(Height_SPAD) +
+  aes(x = Height, y = SPAD_mean)+
   geom_point()
-  
 
 Reg_plot +
-  geom_smooth(method = "lm", se = FALSE) +
-  geom_text(x = 10, y = 0.15,
+  geom_smooth(method = "lm", linetype = "dotted", se = FALSE) +
+  geom_text(x = 40, y = 35,
             label = paste("R-squared = ", Rsq, "\n", 
                           "y = ", slope, "x +", int,"\n", "p =", p)) +
-  ylab("Stomatal Conductance (mmol m −2 s −1)")+
-  xlab("Soil Moisture (%VWC)")+
-  ggtitle("Oak Seedling Stomatal Conductance vs Soil Moisture")
+  ylab("Leaf Greenness (SPAD)")+
+  xlab("Height (cm)")+
+  ggtitle("Oak Seedling Height vs Leaf Greenness")+
+theme_classic()
+
 ```
