@@ -268,6 +268,8 @@ bartlett.test(SPAD_mean ~ Treatment, data = SPAD_Data)
 # Bartlett's K-squared = 0.72012, df = 2, p-value = 0.6976
 ```
 
+### One-Way ANOVA
+
 ```{r}
 # Running ANOVA
 
@@ -275,6 +277,8 @@ anova(anova_model2)
 # p = 0.5042
 
 ```
+
+### Figure
 
 ```{r}
 anova2_summary <- SPAD_Data |> 
@@ -331,14 +335,14 @@ shapiro.test(reg_model$residuals)
 spearcor <- cor.test(Height_SPAD$SPAD_mean, Height_SPAD$Height, method = "spearman", exact = FALSE)
 
 spearcor$estimate
-rho_spear <- round(spearcor$estimate, 3)
+rho_spear <- round(spearcor$estimate, 4)
 
 spearcor$p.value
-round(spearcor$p.value, 3)
-# rho = -0.054, p-value = 0.837
+round(spearcor$p.value, 4)
+# rho = -0.0539, p-value = 0.8372
 ```
 
-### Simple Linear Regression
+### Calculating Line of Best Fit
 
 ```{r}
 
@@ -347,13 +351,11 @@ summary(reg_model)
 # making the vlaues into objects so that I can write the formula for the best fit line on the final figure
 slope <- coef(reg_model)[2]
 int <- coef(reg_model)[1]
-p <- summary(reg_model)$coefficients[2, 4]
-Rsq <- summary(reg_model)$r.squared
+p <- round(spearcor$p.value, 3)
 
-Rsq <- round(Rsq, 4)
-slope <- round(slope, 4)
-int <- round(int, 4)
-p <- round(p, 4)
+slope <- round(slope, 3)
+int <- round(int, 3)
+rho_spear <- round(rho_spear, 3)
 
 ```
 
@@ -368,8 +370,7 @@ Reg_plot <- ggplot(Height_SPAD) +
 Reg_plot +
   geom_smooth(method = "lm", linetype = "dotted", se = FALSE) +
   geom_text(x = 40, y = 35,
-            label = paste("R-squared = ", Rsq, "\n", 
-                          "y = ", slope, "x +", int,"\n", "p =", p)) +
+            label = paste("Spearman's rho = ", rho_spear, "\n", "p = ", p, "\n", "y = ", slope, "x +", int)) +
   ylab("Leaf Greenness (SPAD)")+
   xlab("Height (cm)")+
   ggtitle("Oak Seedling Height vs Leaf Greenness")+
