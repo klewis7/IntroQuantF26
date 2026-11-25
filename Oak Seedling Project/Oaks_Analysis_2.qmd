@@ -203,6 +203,12 @@ tukey_res <- TukeyHSD( aov(log(Height) ~ Treatment, data = Height_Data) )
 print(tukey_res)
 # OS-AC = 0.01356367
 
+tukey_df <- as.data.frame(tukey_res$Treatment)
+tukey_df$Comparison <- rownames(tukey_df)
+rownames(tukey_df) <- NULL
+
+# Reorder so Comparison is the first column
+tukey_df <- tukey_df[, c(5, 1:4)]
 ```
 
 ### Figure
@@ -212,9 +218,10 @@ print(tukey_res)
 anova_summary <- Height_Data |> 
   group_by(Treatment) |>
   summarise(mean = mean(Height), 
-            se = sd(Height)/sqrt(n()))
+            se = sd(Height)/sqrt(n())) 
 
-ggplot(anova_summary) + 
+
+anovaplot <- ggplot(anova_summary) + 
   aes(x = Treatment, y = mean, fill = Treatment) + 
   geom_col() + 
   geom_errorbar(aes(ymin = (mean - se), ymax = (mean + se)), width = 0.2)+
@@ -229,6 +236,19 @@ ggplot(anova_summary) +
             size = 4.5)+ 
       ylim(0, 38)
 
+tiff("anova.tif", width =4.5, height = 4, units = 'in', res = 300)
+anovaplot 
+dev.off()
+
+```
+
+### Table
+
+```{r}
+
+anova(anova_model)
+
+anova_df <- as.data.frame(anova(anova_model))
 ```
 
 ## ANOVA II
@@ -276,6 +296,7 @@ bartlett.test(SPAD_mean ~ Treatment, data = SPAD_Data)
 anova(anova_model2)
 # p = 0.5042
 
+anova2_df <- as.data.frame(anova(anova_model2))
 ```
 
 ### Figure
@@ -286,7 +307,7 @@ anova2_summary <- SPAD_Data |>
   summarise(mean = mean(SPAD_mean), 
             se = sd(SPAD_mean)/sqrt(n()))
 
-ggplot(anova2_summary) +
+anova2plot <- ggplot(anova2_summary) +
   aes(x = reorder(Treatment, mean), y = mean, fill = Treatment) + 
   geom_col() + 
   geom_errorbar(aes(ymin = (mean - se), ymax = (mean + se)), width = 0.2) +
@@ -296,6 +317,10 @@ ggplot(anova2_summary) +
   theme_classic()+
   theme(legend.position = "none") +
   ggtitle("Leaf Greenness of Oak Seedlings Across Treatments")
+
+tiff("anova2final.tif", width =6, height = 4, units = 'in', res = 300)
+anova2plot 
+dev.off()
 
 ```
 
@@ -367,7 +392,7 @@ Reg_plot <- ggplot(Height_SPAD) +
   aes(x = Height, y = SPAD_mean)+
   geom_point()
 
-Reg_plot +
+Reg_plot <- Reg_plot +
   geom_smooth(method = "lm", linetype = "dotted", se = FALSE) +
   geom_text(x = 40, y = 35,
             label = paste("Spearman's rho = ", rho_spear, "\n", "p = ", p, "\n", "y = ", slope, "x +", int)) +
@@ -375,5 +400,9 @@ Reg_plot +
   xlab("Height (cm)")+
   ggtitle("Oak Seedling Height vs Leaf Greenness")+
 theme_classic()
+
+tiff("reg.tif", width =4.5, height = 4, units = 'in', res = 300)
+Reg_plot 
+dev.off()
 
 ```
